@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rangierbahnhof</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="stil.css">
+</head>
+<body>
+  <main id="buehne">
+    <canvas id="szene" aria-label="3D-Ansicht des Rangierbahnhofs"></canvas>
+
+    <header class="schild" id="titel">
+      <h1>Rangierbahnhof</h1>
+      <p class="verbindung" id="verbindung"><span class="lampe" id="verbindungLampe"></span><span id="verbindungText">Java wird gesucht</span></p>
+    </header>
+
+    <nav class="tasten kamera" aria-label="Kamera">
+      <button type="button" data-kamera="uebersicht" aria-pressed="true">Übersicht</button>
+      <button type="button" data-kamera="oben" aria-pressed="false">Von oben</button>
+      <button type="button" data-kamera="lok" aria-pressed="false">Lok folgen</button>
+    </nav>
+
+    <details class="schild" id="checkliste" hidden>
+      <summary id="checklisteTitel">Checkliste</summary>
+      <ol id="checklistePunkte"></ol>
+    </details>
+
+    <p id="hinweisMaus">Ziehen dreht die Ansicht, das Mausrad zoomt, Rechtsklick-Ziehen verschiebt.</p>
+  </main>
+
+  <section id="pult" aria-label="Stellpult">
+    <div class="feld" id="feldModus">
+      <div class="umschalter" role="group" aria-label="Betriebsart">
+        <button type="button" id="modusHand" aria-pressed="true">Selbst rangieren</button>
+        <button type="button" id="modusAlgo" aria-pressed="false">Algorithmus</button>
+      </div>
+      <div class="zeile">
+        <label for="anzahl">Waggons</label>
+        <select id="anzahl">
+          <option>3</option><option>4</option><option>5</option><option selected>6</option>
+          <option>7</option><option>8</option><option>9</option>
+        </select>
+        <button type="button" id="wuerfeln">Neu würfeln</button>
+        <button type="button" id="vonVorn">Von vorn</button>
+      </div>
+      <div class="zeile" id="tastenAlgo" hidden>
+        <button type="button" class="haupt" id="ausfuehren">sortiere() ausführen</button>
+        <button type="button" id="pause" disabled>Pause</button>
+        <button type="button" id="einSchritt" disabled>Ein Schritt</button>
+        <button type="button" id="zumEnde" disabled>Zum Ende</button>
+      </div>
+      <div class="zeile" id="tastenHand">
+        <button type="button" id="zumEndeHand" disabled>Fahrten überspringen</button>
+      </div>
+    </div>
+
+    <div class="feld" id="gleisbild" aria-label="Gleisbild">
+      <div class="gleise" id="gleisReihen"></div>
+      <svg class="weiche" viewBox="0 0 90 114" aria-hidden="true">
+        <path d="M0 19 H14 L44 57 M0 95 H14 L44 57 M0 57 H90" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
+      </svg>
+      <p class="legende">Prellbock links, die Lok kuppelt rechts an.</p>
+    </div>
+
+    <div class="feld" id="feldAnzeige">
+      <p class="zaehler"><span id="zaehlerZahl">0</span> <span id="zaehlerText">Verschiebungen</span></p>
+      <p class="befehl" id="befehl">&nbsp;</p>
+      <p class="meldung" id="meldung" role="status" aria-live="polite"></p>
+      <div class="zeile tempo">
+        <label for="tempo">Tempo</label>
+        <input type="range" id="tempo" min="0" max="100" value="45">
+        <output id="tempoWert" for="tempo">2×</output>
+      </div>
+    </div>
+  </section>
+
+  <noscript>Für die 3D-Ansicht muss JavaScript im Browser erlaubt sein.</noscript>
+  <script type="module" src="js/haupt.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 640" width="1050" height="640" font-family="Arial, Helvetica, sans-serif" fill="#1d211c">
+<title>Implementationsdiagramm Rangierbahnhof</title>
+<defs><marker id="spitze" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M1 1 L11 6 L1 11" fill="none" stroke="#1d211c" stroke-width="1.6"/></marker></defs>
+<rect width="1050" height="640" fill="#ffffff"/>
+<text x="30" y="38" font-size="21" font-weight="700">Implementationsdiagramm: Rangierbahnhof</text>
+<rect x="30" y="70" width="545" height="269" fill="#ffffff" stroke="#1d211c" stroke-width="2"/>
+<rect x="30" y="70" width="545" height="38" fill="#ffe89a" stroke="#1d211c" stroke-width="2"/>
+<text x="302.5" y="95" text-anchor="middle" font-size="18" font-weight="700">Rangierbahnhof</text>
+<line x1="30" y1="143" x2="575" y2="143" stroke="#1d211c" stroke-width="2"/>
+<text x="42" y="166" font-size="15">+ Rangierbahnhof(pAnzeige: Anzeige)</text>
+<text x="42" y="189" font-size="15">+ getGleisA(): Stack&lt;Waggon&gt;</text>
+<text x="42" y="212" font-size="15">+ getGleisB(): Stack&lt;Waggon&gt;</text>
+<text x="42" y="235" font-size="15">+ getGleisC(): Stack&lt;Waggon&gt;</text>
+<text x="42" y="258" font-size="15">+ fuegeWaggonHinzu(pWaggon: Waggon)</text>
+<text x="42" y="281" font-size="15">+ istLeer(pGleis: Stack&lt;Waggon&gt;): boolean</text>
+<text x="42" y="304" font-size="15">+ verschiebeWaggon(pVon: Stack&lt;Waggon&gt;, pNach: Stack&lt;Waggon&gt;)</text>
+<text x="42" y="327" font-size="15">+ sortiere()</text>
+<rect x="720" y="70" width="300" height="200" fill="#ffffff" stroke="#1d211c" stroke-width="2"/>
+<rect x="720" y="70" width="300" height="38" fill="#dfe3d8" stroke="#1d211c" stroke-width="2"/>
+<text x="870.0" y="95" text-anchor="middle" font-size="18" font-weight="700">Stack</text>
+<line x1="720" y1="143" x2="1020" y2="143" stroke="#1d211c" stroke-width="2"/>
+<text x="732" y="166" font-size="15">+ Stack()</text>
+<text x="732" y="189" font-size="15">+ isEmpty(): boolean</text>
+<text x="732" y="212" font-size="15">+ push(pContent: ContentType)</text>
+<text x="732" y="235" font-size="15">+ pop()</text>
+<text x="732" y="258" font-size="15">+ top(): ContentType</text>
+<rect x="905" y="56" width="128" height="28" fill="#ffffff" stroke="#1d211c" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="969" y="75" text-anchor="middle" font-size="14">ContentType</text>
+<rect x="745" y="400" width="250" height="131" fill="#ffffff" stroke="#1d211c" stroke-width="2"/>
+<rect x="745" y="400" width="250" height="38" fill="#ffe89a" stroke="#1d211c" stroke-width="2"/>
+<text x="870.0" y="425" text-anchor="middle" font-size="18" font-weight="700">Waggon</text>
+<line x1="745" y1="473" x2="995" y2="473" stroke="#1d211c" stroke-width="2"/>
+<text x="757" y="461" font-size="15">- nummer: int</text>
+<text x="757" y="496" font-size="15">+ Waggon(pNummer: int)</text>
+<text x="757" y="519" font-size="15">+ getNummer(): int</text>
+<rect x="30" y="449" width="545" height="108" fill="#ffffff" stroke="#1d211c" stroke-width="2"/>
+<rect x="30" y="449" width="545" height="38" fill="#dfe3d8" stroke="#1d211c" stroke-width="2"/>
+<text x="302.5" y="474" text-anchor="middle" font-size="18" font-weight="700">Anzeige</text>
+<line x1="30" y1="522" x2="575" y2="522" stroke="#1d211c" stroke-width="2"/>
+<text x="42" y="545" font-size="15">+ zeigeVerschiebung(pVon: Stack&lt;Waggon&gt;, pNach: Stack&lt;Waggon&gt;)</text>
+<line x1="575" y1="135" x2="716" y2="135" stroke="#1d211c" stroke-width="2" marker-end="url(#spitze)"/>
+<text x="646" y="127" text-anchor="middle" font-size="15">- gleisA</text>
+<line x1="575" y1="181" x2="716" y2="181" stroke="#1d211c" stroke-width="2" marker-end="url(#spitze)"/>
+<text x="646" y="173" text-anchor="middle" font-size="15">- gleisB</text>
+<line x1="575" y1="227" x2="716" y2="227" stroke="#1d211c" stroke-width="2" marker-end="url(#spitze)"/>
+<text x="646" y="219" text-anchor="middle" font-size="15">- gleisC</text>
+<line x1="302" y1="339" x2="302" y2="445" stroke="#1d211c" stroke-width="2" marker-end="url(#spitze)"/>
+<text x="314" y="399" text-anchor="start" font-size="15">- anzeige</text>
+<line x1="870" y1="270" x2="870" y2="396" stroke="#1d211c" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#spitze)"/>
+<text x="882" y="332" text-anchor="start" font-size="15">ContentType: Waggon</text>
+<rect x="30" y="592" width="26" height="18" fill="#ffe89a" stroke="#1d211c" stroke-width="1.5"/>
+<text x="64" y="606" font-size="14">von Ihnen zu implementieren</text>
+<rect x="290" y="592" width="26" height="18" fill="#dfe3d8" stroke="#1d211c" stroke-width="1.5"/>
+<text x="324" y="606" font-size="14">vorgegeben</text>
+</svg>

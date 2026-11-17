@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Rangierbahnhof starten",
+      "request": "launch",
+      "mainClass": "rangierbahnhof.Main"
+    }
+  ]
+}
