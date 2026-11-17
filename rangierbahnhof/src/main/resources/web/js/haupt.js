@@ -501,6 +501,20 @@ for (const knopf of document.querySelectorAll('[data-kamera]')) {
   knopf.addEventListener('click', () => stelleKameraEin(knopf.dataset.kamera));
 }
 
+const pathKnopf = $('pathtracing');
+if (welt.pathtracing) {
+  welt.pathtracingAktiv = erinnere('pathtracing') === 'true';
+  pathKnopf.hidden = false;
+  pathKnopf.setAttribute('aria-pressed', String(welt.pathtracingAktiv));
+  pathKnopf.title = 'GPU-Pathtracing: Das Bild verfeinert sich bei ruhender Kamera. Bewegungen starten die Berechnung neu.';
+  pathKnopf.addEventListener('click', () => {
+    welt.pathtracingAktiv = !welt.pathtracingAktiv;
+    welt.pathtracing.samples = 0;
+    pathKnopf.setAttribute('aria-pressed', String(welt.pathtracingAktiv));
+    merke('pathtracing', welt.pathtracingAktiv);
+  });
+}
+
 const nebelKnopf = $('volumenlicht');
 if (welt.volumenlicht) {
   welt.volumenlichtAktiv = erinnere('volumenlicht') !== 'false';

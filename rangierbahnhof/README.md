@@ -74,3 +74,46 @@ Browser ihn unterstützt.
 - *Die Checkliste meldet eine Endlosschleife*: das Programm in VS Code
   stoppen (rotes Quadrat), den Fehler beheben und neu starten.
 - *Im Terminal starten* (statt über Run): `mvn compile exec:java`
+
+## Pathtracing
+
+Der Schalter **Pathtracing** aktiviert einen progressiven WebGL2-Renderer.
+Bei ruhender Kamera verfeinert sich das zunächst körnige Bild mit jedem Frame.
+Kamera-, Fahrzeug-, Material- und Größenänderungen starten die Akkumulation neu.
+Der Schalterzustand wird lokal gespeichert. Standardmäßig bleibt der bisherige
+Renderer aktiv. **Volumenlicht** schaltet in beiden Renderern den Bodennebel um.
+Die Schalter erscheinen auf GPUs mit `EXT_color_buffer_float`.
+
+Der Pathtracer berechnet Dreieckschnittpunkte über eine BVH, direkte Sonne mit
+weichen Schatten, Himmelslicht, emissive Materialien und bis zu fünf Pfadsegmente
+mit diffusen und näherungsweise rauen metallischen Reflexionen. Er übernimmt
+instanzierte Geometrie, Materialfarben, Instanzfarben und Farbtexturen aus der
+bestehenden Szene. Bewegte Geometrie aktualisiert die BVH, ohne sie neu aufzubauen.
+Die interne Auflösung ist auf 960 × 540 Pixel begrenzt. Es gibt keinen Denoiser;
+mehr Samples reduzieren das Rauschen. Die Geschwindigkeit hängt stark von der GPU ab.
+Schilder, Waggonnummern als Sprites und Gleismarkierungen bleiben lesbare Overlays;
+sie sind nicht Teil der Lichtsimulation. Transparenz, Normalmaps und physikalische
+Glasbrechung werden nicht simuliert. Der Nebel wird auf dem Kamerastrahl integriert.
+
+### Browsertest
+
+Bei laufendem Java-Server:
+
+```sh
+cd rangierbahnhof/tests
+npm install
+npx playwright install chromium
+TEST_URL=http://127.0.0.1:8765 npm test
+```
+
+Alternativ die Webdateien mit `python3 -m http.server 8080 --directory
+rangierbahnhof/src/main/resources/web` aus dem Repository-Ordner ausliefern;
+`npm test` verwendet standardmäßig Port 8080. Ein installiertes Chromium kann mit
+`CHROMIUM_PATH=/usr/bin/chromium` gewählt werden. Die Testabhängigkeit Playwright
+wird nur für diesen Test benötigt, nicht zum Starten des Projekts.
+
+Der Test prüft Shaderfehler, endliche und sichtbare GPU-Ausgabe, Akkumulation,
+Rücksetzung bei Kamera-, Lok- und Nebeländerungen, Wiederverwendung von BVH und
+Atlas sowie das Umschalten beider Renderer. Er nutzt für Software-WebGL eine
+reduzierte Auflösung von 160 × 90 Pixeln. Die Beurteilung von Bildqualität und
+GPU-Leistung bei voller Auflösung erfolgt zusätzlich interaktiv im Browser.

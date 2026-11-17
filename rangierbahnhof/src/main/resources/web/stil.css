@@ -71,7 +71,7 @@ ol { padding: 0; list-style: none; }
   font-weight: 700;
   letter-spacing: 0.01em;
 }
-#volumenlicht { margin-top: 7px; font-size: 13px; }
+#volumenlicht, #pathtracing { margin-top: 7px; font-size: 13px; }
 
 .verbindung {
   display: flex;
