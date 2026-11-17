@@ -11,7 +11,7 @@ package rangierbahnhof;
  *     oben im Stack   =  der vorderste Waggon (hier kuppelt die Lok an)
  *
  * AUFGABE: Implementieren Sie die Klasse nach dem Implementationsdiagramm
- * (Ordner "diagramm"). Jede Stelle, an der etwas fehlt, ist mit TODO markiert.
+ * (Ordner "diagramm"). Jede Stelle, an der etwas fehlt, ist mit 
  * Die Klasse Stack ist vorgegeben; Sie benötigen von ihr nur die Methoden
  * isEmpty(), push(...), pop() und top().
  *
@@ -20,7 +20,7 @@ package rangierbahnhof;
  */
 public class Rangierbahnhof {
 
-    // TODO: Die drei Gleise gleisA, gleisB und gleisC als Attribute
+    //  Die drei Gleise gleisA, gleisB und gleisC als Attribute
     //       deklarieren. Jedes Gleis ist ein Stack von Waggons.
 
     // Verbindung zur 3D-Ansicht (vorgegeben, nicht verändern).
@@ -40,7 +40,7 @@ public class Rangierbahnhof {
         gleisB = new Stack<Waggon>();
         gleisC = new Stack<Waggon>();
         
-        // TODO: Für jedes der drei Gleise einen neuen, leeren Stack erzeugen.
+        //  Für jedes der drei Gleise einen neuen, leeren Stack erzeugen.
     }
 
     /**
@@ -59,7 +59,7 @@ public class Rangierbahnhof {
      * @return der Stack, der das Gleis B darstellt
      */
     public Stack<Waggon> getGleisB() {
-        // TODO: Das Attribut zurückgeben.
+        //  Das Attribut zurückgeben.
         return gleisB; // Platzhalter – bitte ersetzen
     }
 
@@ -69,7 +69,7 @@ public class Rangierbahnhof {
      * @return der Stack, der das Gleis C darstellt
      */
     public Stack<Waggon> getGleisC() {
-        // TODO: Das Attribut zurückgeben.
+        // Das Attribut zurückgeben.
         return gleisC; // Platzhalter – bitte ersetzen
     }
 
@@ -80,7 +80,7 @@ public class Rangierbahnhof {
      * @param pWaggon der Waggon, der auf Gleis A abgestellt wird
      */
     public void fuegeWaggonHinzu(Waggon pWaggon) {
-        // TODO: pWaggon oben auf den Stack von Gleis A legen.
+        // pWaggon oben auf den Stack von Gleis A legen.
         gleisA.push(pWaggon);
     }
 
@@ -94,7 +94,7 @@ public class Rangierbahnhof {
      * @return true, falls das Gleis leer ist, sonst false
      */
     public boolean istLeer(Stack<Waggon> pGleis) {
-        // TODO: Den Stack pGleis fragen, ob er leer ist, und die Antwort
+        //  Den Stack pGleis fragen, ob er leer ist, und die Antwort
         //       zurückgeben.
         if (pGleis.isEmpty()){
             return true;
@@ -116,7 +116,7 @@ public class Rangierbahnhof {
      * @param pNach das Gleis, auf das der Waggon geschoben wird
      */
     public void verschiebeWaggon(Stack<Waggon> pVon, Stack<Waggon> pNach) {
-        // TODO: Nur wenn pVon nicht leer ist:
+        //  Nur wenn pVon nicht leer ist:
         //   1. den obersten Waggon von pVon in einer lokalen Variablen merken,
         //   2. diesen Waggon von pVon entfernen,
         //   3. ihn oben auf pNach legen,
@@ -153,7 +153,7 @@ public class Rangierbahnhof {
      *     Waggon steht, bevor Sie nach dem vordersten Waggon fragen.
      */
     public void sortiere() {
-        // TODO: Hier entsteht Ihr Algorithmus.
+        //  Hier entsteht Ihr Algorithmus.
         while(!istLeer(gleisA)){
             int kleinste = gleisA.top().getNummer();
 
