@@ -501,6 +501,18 @@ for (const knopf of document.querySelectorAll('[data-kamera]')) {
   knopf.addEventListener('click', () => stelleKameraEin(knopf.dataset.kamera));
 }
 
+const nebelKnopf = $('volumenlicht');
+if (welt.volumenlicht) {
+  welt.volumenlichtAktiv = erinnere('volumenlicht') !== 'false';
+  nebelKnopf.hidden = false;
+  nebelKnopf.setAttribute('aria-pressed', String(welt.volumenlichtAktiv));
+  nebelKnopf.addEventListener('click', () => {
+    welt.volumenlichtAktiv = !welt.volumenlichtAktiv;
+    nebelKnopf.setAttribute('aria-pressed', String(welt.volumenlichtAktiv));
+    merke('volumenlicht', welt.volumenlichtAktiv);
+  });
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;

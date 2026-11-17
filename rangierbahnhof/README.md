@@ -62,6 +62,11 @@ bei Fehlern einen Hinweis mit Zeilennummer.
 mit der rechten Maustaste verschiebt. Oben rechts gibt es drei feste
 Blickwinkel.
 
+**Volumenlicht.** Raymarching berechnet den bodennahen Nebel und das darin
+gestreute Sonnenlicht. Gebäude und Fahrzeuge werfen Schatten in den Nebel.
+Der Schalter **Volumenlicht** blendet den Effekt aus und ein, wenn der
+Browser ihn unterstützt.
+
 ## Wenn etwas nicht klappt
 
 - *„Java-Programm läuft nicht“* (rote Lampe oben links): die Klasse `Main`
