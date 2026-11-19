@@ -502,28 +502,22 @@ for (const knopf of document.querySelectorAll('[data-kamera]')) {
 }
 
 const pathKnopf = $('pathtracing');
-if (welt.pathtracing) {
-  welt.pathtracingAktiv = erinnere('pathtracing') === 'true';
-  pathKnopf.hidden = false;
+const rayKnopf = $('raymarching');
+const gemerkterRenderer = erinnere('renderer') ?? (erinnere('pathtracing') === 'true' ? 'pathtracing' : '');
+function waehleRenderer(renderer) {
+  welt.pathtracingAktiv = renderer === 'pathtracing' && Boolean(welt.pathtracing);
+  welt.raymarchingAktiv = renderer === 'raymarching';
+  if (welt.pathtracing) welt.pathtracing.samples = 0;
   pathKnopf.setAttribute('aria-pressed', String(welt.pathtracingAktiv));
-  pathKnopf.title = 'GPU-Pathtracing: Das Bild verfeinert sich bei ruhender Kamera. Bewegungen starten die Berechnung neu.';
-  pathKnopf.addEventListener('click', () => {
-    welt.pathtracingAktiv = !welt.pathtracingAktiv;
-    welt.pathtracing.samples = 0;
-    pathKnopf.setAttribute('aria-pressed', String(welt.pathtracingAktiv));
-    merke('pathtracing', welt.pathtracingAktiv);
-  });
+  rayKnopf.setAttribute('aria-pressed', String(welt.raymarchingAktiv));
 }
-
-const nebelKnopf = $('volumenlicht');
-if (welt.volumenlicht) {
-  welt.volumenlichtAktiv = erinnere('volumenlicht') !== 'false';
-  nebelKnopf.hidden = false;
-  nebelKnopf.setAttribute('aria-pressed', String(welt.volumenlichtAktiv));
-  nebelKnopf.addEventListener('click', () => {
-    welt.volumenlichtAktiv = !welt.volumenlichtAktiv;
-    nebelKnopf.setAttribute('aria-pressed', String(welt.volumenlichtAktiv));
-    merke('volumenlicht', welt.volumenlichtAktiv);
+waehleRenderer(gemerkterRenderer);
+pathKnopf.hidden = !welt.pathtracing;
+for (const knopf of [pathKnopf, rayKnopf]) {
+  knopf.addEventListener('click', () => {
+    const wahl = knopf.getAttribute('aria-pressed') === 'true' ? '' : knopf.id;
+    waehleRenderer(wahl);
+    merke('renderer', wahl);
   });
 }
 
