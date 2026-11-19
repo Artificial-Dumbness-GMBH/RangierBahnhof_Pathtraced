@@ -114,19 +114,21 @@ mat3 reliefBasis(vec3 position, vec3 n, vec2 dx, vec2 dy) {
 // xyz enthält die Texturkoordinate und die Tiefe des Schnittpunkts.
 vec3 marschiereRelief(vec2 uv, vec3 blick, float relief, vec2 dx, vec2 dy) {
   vec2 versatz = blick.xy * relief / max(blick.z, 0.25);
-  const float schicht = 1.0 / 24.0;
+  // Flache Blickwinkel durchqueren mehr Texel und brauchen kleinere Schritte.
+  int schichten = int(mix(32.0, 12.0, clamp(blick.z, 0.0, 1.0)));
+  float schicht = 1.0 / float(schichten);
   vec2 schritt = versatz * schicht;
   float tiefe = 0.0;
   float abstand = textureGrad(roughnessMap, uv, dx, dy).r;
   float vorher = abstand;
-  for (int i = 0; i < 24; i++) {
-    if (abstand <= 0.0) break;
+  for (int i = 0; i < 32; i++) {
+    if (i >= schichten || abstand <= 0.0) break;
     vorher = abstand;
     uv -= schritt;
     tiefe += schicht;
     abstand = textureGrad(roughnessMap, uv, dx, dy).r - tiefe;
   }
-  float anteil = -abstand / max(vorher - abstand, 1e-5);
+  float anteil = clamp(-abstand / max(vorher - abstand, 1e-5), 0.0, 1.0);
   return vec3(uv + schritt * anteil, tiefe - schicht * anteil);
 }
 

@@ -1,5 +1,7 @@
 import * as THREE from './lib/three.module.js';
 
+import { denoiser, upscaler } from './bildfilter.js';
+
 const vertexShader = `out vec2 bildUv;
 void main() { bildUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 const fragmentShader = /* glsl */ `
@@ -112,10 +114,12 @@ void main() {
   vec2 uv = bildUv + (vec2(zufall(),zufall())-0.5)/aufloesung;
   vec4 v = inverseProjektion*vec4(uv*2.0-1.0,1.0,1.0);
   vec3 d = normalize(mat3(kameraWelt)*v.xyz), o = kameraWelt[3].xyz;
+  float sichttiefe = 0.0;
   vec3 licht=vec3(0), gewicht=vec3(1);
   for (int bounce=0; bounce<5; bounce++) {
     float l; vec2 bary; int hit=treffer(o,d,l,bary,false,1e20);
     if(hit<0) { licht+=gewicht*himmel(d); break; }
+    if (bounce==0) sichttiefe = -dot(d,kameraWelt[2].xyz)*l;
     int t=hit*11;
     vec3 n=normalize(daten(dreiecke,t+3).xyz*(1.0-bary.x-bary.y)+daten(dreiecke,t+4).xyz*bary.x+daten(dreiecke,t+5).xyz*bary.y);
     if(dot(n,d)>0.0) n=-n;
@@ -178,7 +182,7 @@ void main() {
     }
   }
   vec3 alt = samples>0.0 ? texture(vorher,bildUv).rgb : vec3(0);
-  ausgabe=vec4(alt+(licht-alt)/(samples+1.0),1);
+  ausgabe=vec4(alt+(licht-alt)/(samples+1.0),sichttiefe);
 }`;
 
 function datenTextur(werte, breite) {
@@ -227,21 +231,22 @@ export class Pathtracing {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.quad.frustumCulled = false;
     this.szene.add(this.quad);
+    this.gefiltert = this.ziele[0].clone();
+    this.denoiser = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3, vertexShader, fragmentShader: denoiser,
+      uniforms: { bild: { value: null }, samples: { value: 1 } },
+      depthTest: false, depthWrite: false, toneMapped: false,
+    });
     this.ausgabe = new THREE.ShaderMaterial({
-      glslVersion: THREE.GLSL3, uniforms: { bild: { value: null } }, vertexShader,
-      fragmentShader: `in vec2 bildUv; out vec4 ausgabe; uniform sampler2D bild;
-        #define gl_FragColor ausgabe
-        void main() { ausgabe=vec4(texture(bild,bildUv).rgb,1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-        }`, depthTest: false, depthWrite: false,
+      glslVersion: THREE.GLSL3, vertexShader, fragmentShader: upscaler,
+      uniforms: { bild: { value: this.gefiltert.texture } }, depthTest: false, depthWrite: false,
     });
   }
 
   passeGroesseAn() {
     this.zeichner.getDrawingBufferSize(this.groesse);
     // Begrenzte interne Auflösung hält den Modus auch auf integrierten GPUs nutzbar.
-    const faktor = Math.min(1, 960 / this.groesse.x, 540 / this.groesse.y);
+    const faktor = Math.min(0.75, 960 / this.groesse.x, 540 / this.groesse.y);
     const b = Math.max(1, Math.floor(this.groesse.x * faktor));
     const h = Math.max(1, Math.floor(this.groesse.y * faktor));
     for (const ziel of this.ziele) ziel.setSize(b, h);
@@ -433,8 +438,14 @@ export class Pathtracing {
     try {
       this.quad.material=this.material;
       this.zeichner.setRenderTarget(ziel); this.zeichner.render(this.szene,this.kamera);
+      this.gefiltert.setSize(ziel.width, ziel.height);
+      this.denoiser.uniforms.bild.value = ziel.texture;
+      this.denoiser.uniforms.samples.value = this.samples + 1;
+      this.quad.material = this.denoiser;
+      this.zeichner.setRenderTarget(this.gefiltert);
+      this.zeichner.render(this.szene, this.kamera);
       this.zeichner.setRenderTarget(null);
-      this.quad.material=this.ausgabe; this.ausgabe.uniforms.bild.value=ziel.texture;
+      this.quad.material=this.ausgabe;
       this.zeichner.render(this.szene,this.kamera);
     } finally { this.zeichner.setRenderTarget(null); }
     this.ziele.reverse(); this.samples=Math.min(this.samples+1,4096);
@@ -456,6 +467,7 @@ export class Pathtracing {
     for(const ziel of this.ziele) ziel.dispose();
     for(const name of ['dreiecke','knoten','atlas']) this.uniforms[name].value?.dispose();
     this.meshCache.clear(); this.maps=[]; this.primitive=null; this.sortiert=null; this.nodes=null;
+    this.gefiltert.dispose(); this.denoiser.dispose();
     this.material.dispose(); this.ausgabe.dispose(); this.quad.geometry.dispose();
   }
 }

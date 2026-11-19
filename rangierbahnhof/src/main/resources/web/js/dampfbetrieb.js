@@ -1,5 +1,3 @@
-import { Dampfeffekte } from './dampfeffekte.js';
-
 const BRENNZEIT = 90; // Simulationssekunden pro Brennstab
 const AUFSCHLAG_CENT = 3500;
 const ERSATZKURS = { usdProPfund: 91.55, datum: '2026-10-30', aktuell: false };
@@ -9,10 +7,11 @@ const geld = (cent) => GELD.format(cent / 100);
 const feld = (id) => document.getElementById(id);
 
 export class Dampfbetrieb {
-  constructor(lok, welt, gespeichert, speichere) {
+  constructor(lok, welt, gespeichert, speichere, beiExplosion) {
     this.lok = lok;
     this.welt = welt;
-    this.effekte = new Dampfeffekte(welt.szene, welt.haloTextur, lok);
+    this.effekte = welt.dampfeffekte;
+    this.beiExplosion = beiExplosion;
     this.speichere = () => speichere(JSON.stringify({
       brennstoff: this.brennstoff, faesser: this.faesser, ausgaben: this.ausgaben,
       autobuy: this.autobuy,
@@ -73,21 +72,29 @@ export class Dampfbetrieb {
     this.faesser++;
     this.brennstoff = BRENNZEIT;
     this.welt.fuelleDepot(this.faesser);
+    this.zeigePreis();
+    if (Math.random() < 0.001) {
+      this.sprenge('Kernschmelze beim Stabwechsel');
+      return true;
+    }
     this.speichere();
     this.zeige();
-    this.zeigePreis();
     return true;
   }
 
-  sprenge() {
+  sprenge(ursache = 'AZ-5 ausgelöst') {
+    if (this.zerstoert) return;
+    this.ursache = ursache;
     this.effekte.explodiere();
     this.brennstoff = 0;
     this.lok.gruppe.visible = false;
     this.speichere();
     this.zeige();
+    this.beiExplosion();
   }
 
   repariere() {
+    this.ursache = null;
     this.lok.gruppe.visible = true;
     this.zeige();
   }

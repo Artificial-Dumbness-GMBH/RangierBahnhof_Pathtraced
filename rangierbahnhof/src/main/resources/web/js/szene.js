@@ -698,9 +698,11 @@ export class Welt {
 
   zeichne() {
     if (this.pathtracingAktiv && this.pathtracing) {
+      this.dampfeffekte?.setzeTiefe(this.pathtracing.ziele[1].texture, this.kamera, true);
       this.pathtracing.zeichne(this.szene, this.kamera, this.mond, this.lichtquellen);
     } else {
       reliefAktiv.value = this.raymarchingAktiv;
+      if (this.dampfeffekte?.sichtbar) this.dampfeffekte.rasterTiefe(this.zeichner, this.szene, this.kamera);
       this.zeichner.render(this.szene, this.kamera);
     }
   }

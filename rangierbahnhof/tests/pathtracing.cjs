@@ -43,10 +43,19 @@ const pixels=await page.evaluate(()=>{
   const w=rangierbahnhof.welt, p=w.pathtracing;
   const data=new Float32Array(160*90*4);
   w.zeichner.readRenderTargetPixels(p.ziele[0],0,0,160,90,data);
-  return {finite:data.every(Number.isFinite), lit:data.some((v,i)=>i%4!==3 && v>0.01)};
+  const filtered = new Float32Array(data.length);
+  w.zeichner.readRenderTargetPixels(p.gefiltert, 0, 0, 160, 90, filtered);
+  return {
+    finite: data.every(Number.isFinite) && filtered.every(Number.isFinite),
+    lit: data.some((v,i) => i % 4 !== 3 && v > 0.01),
+    denoised: filtered.some((v,i) => i % 4 !== 3 && Math.abs(v-data[i]) > 0.005),
+    depthPreserved: filtered.every((v,i) => i % 4 !== 3 || v === data[i]),
+  };
 });
 assert.equal(pixels.finite,true,'finite GPU output');
 assert.equal(pixels.lit,true,'non-black GPU output');
+assert.equal(pixels.denoised,true,'denoiser changes radiance');
+assert.equal(pixels.depthPreserved,true,'denoiser preserves surface depth for upscaling');
 const lampenTest = await page.evaluate(() => {
   const { welt } = rangierbahnhof;
   const { zeichner, pathtracing, lichtquellen } = welt;

@@ -10,6 +10,7 @@ import * as THREE from './lib/three.module.js';
 import { Gleisplan, GLEISE, MASSE } from './gleisplan.js';
 import { Welt } from './szene.js';
 import { Lok, Waggon, WaggonFlotte, WaggonUebersicht, farbeVon } from './fahrzeuge.js';
+import { Dampfeffekte } from './dampfeffekte.js';
 import { Dampfbetrieb } from './dampfbetrieb.js';
 import { Rangierbetrieb } from './rangierfahrt.js';
 import { Kamerafuehrung } from './kamera.js';
@@ -20,7 +21,8 @@ const welt = new Welt($('szene'));
 const kamera = new Kamerafuehrung(welt.kamera, $('szene'));
 const lok = new Lok();
 welt.fahrzeuge.add(lok.gruppe);
-const dampfbetrieb = new Dampfbetrieb(lok, welt, erinnere('dampflok'), (stand) => merke('dampflok', stand));
+welt.dampfeffekte = new Dampfeffekte(welt.szene, lok);
+const dampfbetrieb = new Dampfbetrieb(lok, welt, erinnere('dampflok'), (stand) => merke('dampflok', stand), beiExplosion);
 
 let sortierAnfrage = 0;
 
@@ -284,7 +286,7 @@ function melde(text, art = '') {
 
 function zeigeGrundmeldung() {
   if (dampfbetrieb.zerstoert) {
-    melde('Die Lok ist explodiert. „Von vorn“ setzt eine Ersatzlok aufs Gleis.', 'schlecht');
+    melde(dampfbetrieb.ursache + '. „Von vorn“ setzt eine Ersatzlok aufs Gleis.', 'schlecht');
   } else if (!dampfbetrieb.fahrbereit) {
     melde('Brennstab kaufen, um weiterzurangieren.', 'schlecht');
   } else if (zustand.modus === 'hand') {
@@ -437,6 +439,14 @@ function stelleKameraEin(art, dauer = 0.9) {
   } else if (art === 'oben') {
     const ziel = new THREE.Vector3(0, 0, -1);
     kamera.fahreZu({ ziel, abstand: kamera.passenderAbstand(ecken, ziel, 2.5, 0, rand), neigung: 2.5, drehung: 0 }, dauer);
+  } else if (art === 'explosion') {
+    const ziel = welt.dampfeffekte.pilz.position.clone().setY(welt.dampfeffekte.boden + 42);
+    const ecken = [];
+    for (const x of [-75, 75]) for (const z of [-65, 65]) for (const y of [-42, 48]) {
+      ecken.push(ziel.clone().add(new THREE.Vector3(x, y, z)));
+    }
+    const abstand = kamera.passenderAbstand(ecken, ziel, 76, -12, rand);
+    kamera.fahreZu({ ziel, abstand, neigung: 76, drehung: -12 }, dauer);
   } else if (art === 'lok') {
     kamera.fahreZu({ ziel: lok.gruppe.position.clone().setY(2), abstand: 50, neigung: 64, drehung: -24 }, dauer);
     kamera.folgt = () => new THREE.Vector3(lok.gruppe.position.x, 2, lok.gruppe.position.z);
@@ -519,10 +529,12 @@ $('anzahl').addEventListener('change', () => {
   baueAuf(wuerfle(Number($('anzahl').value)));
 });
 $('vonVorn').addEventListener('click', () => {
+  if (zustand.kameraArt === 'explosion') stelleKameraEin('uebersicht');
   dampfbetrieb.repariere();
   stelleStartHer();
 });
 function zeigeNachkauf() {
+  if (dampfbetrieb.zerstoert) return;
   zeichneGleisbild();
   stelleTastenEin();
   if (zustand.betrieb.beschaeftigt && zustand.laeuft) {
@@ -540,8 +552,9 @@ $('brennstabKaufen').addEventListener('click', () => {
 $('autobuy').addEventListener('click', () => {
   if (dampfbetrieb.setzeAutobuy(!dampfbetrieb.autobuy)) zeigeNachkauf();
 });
-$('az5').addEventListener('click', () => {
-  dampfbetrieb.sprenge();
+$('az5').addEventListener('click', () => dampfbetrieb.sprenge());
+function beiExplosion() {
+  stelleKameraEin('explosion', 1.4);
   sortierAnfrage++;
   zustand.lauf = null;
   zustand.laeuft = false;
@@ -551,7 +564,7 @@ $('az5').addEventListener('click', () => {
   zeichneZaehler();
   zeigeGrundmeldung();
   stelleTastenEin();
-});
+}
 $('ausfuehren').addEventListener('click', () => fuehreAlgorithmusAus());
 $('pause').addEventListener('click', () => {
   zustand.vorspulen = false;
