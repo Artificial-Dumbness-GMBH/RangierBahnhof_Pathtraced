@@ -4,7 +4,7 @@
 
 import * as THREE from './lib/three.module.js';
 import { GLEISE, MASSE } from './gleisplan.js';
-import { Volumenlicht } from './volumenlicht.js';
+import { pbrMaterial, reliefAktiv } from './pbr.js';
 import { Pathtracing } from './pathtracing.js';
 
 const Y0 = MASSE.SCHIENE_OBEN;
@@ -102,11 +102,10 @@ export class Welt {
     this.zeichner.toneMapping = THREE.ACESFilmicToneMapping;
     this.zeichner.toneMappingExposure = 1.0;
     this.zeichner.outputColorSpace = THREE.SRGBColorSpace;
-    this.volumenlicht = this.zeichner.extensions.has('EXT_color_buffer_float')
-      ? new Volumenlicht(this.zeichner)
+    this.raymarchingAktiv = false;
+    this.pathtracing = this.zeichner.extensions.has('EXT_color_buffer_float')
+      ? new Pathtracing(this.zeichner)
       : null;
-    this.volumenlichtAktiv = Boolean(this.volumenlicht);
-    this.pathtracing = this.volumenlicht ? new Pathtracing(this.zeichner) : null;
     this.pathtracingAktiv = false;
 
     this.szene = new THREE.Scene();
@@ -118,7 +117,6 @@ export class Welt {
       c.fillStyle = verlauf;
       c.fillRect(0, 0, b, h);
     });
-    this.szene.fog = new THREE.Fog(0xd3e3ea, 240, 760);
 
     this.kamera = new THREE.PerspectiveCamera(36, 1, 1, 1800);
 
@@ -132,7 +130,7 @@ export class Welt {
 
     const gras = gesprenkelt('#6d8c55', ['#63824c', '#76955d', '#5b7a47', '#7f9c66'], 2600, 5, 7);
     gras.repeat.set(170, 170);
-    const boden = new THREE.Mesh(new THREE.PlaneGeometry(1700, 1700), matt(0xffffff, gras));
+    const boden = new THREE.Mesh(new THREE.PlaneGeometry(1700, 1700), pbrMaterial(0xffffff, 'gras', gras));
     boden.rotation.x = -Math.PI / 2;
     boden.receiveShadow = true;
     this.szene.add(boden);
@@ -228,7 +226,7 @@ export class Welt {
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setIndex(index);
     geo.computeVertexNormals();
-    const bettung = new THREE.Mesh(geo, matt(0xffffff, schotter));
+    const bettung = new THREE.Mesh(geo, pbrMaterial(0xffffff, 'schotter', schotter));
     bettung.userData.wirftSchatten = false;
     g.add(bettung);
   }
@@ -287,7 +285,7 @@ export class Welt {
         }
       }
     }
-    const stahl = new THREE.MeshStandardMaterial({ color: 0x9a9792, roughness: 0.35, metalness: 0.55 });
+    const stahl = pbrMaterial(0x9a9792, 'stahl');
     const schienen = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.16, 0.1), stahl, eintraege.length);
     const hilf = new THREE.Object3D();
     eintraege.forEach(([x, z, drehung, laenge], i) => {
@@ -374,7 +372,7 @@ export class Welt {
   baueWeg(g, plan) {
     const kies = gesprenkelt('#c2b79d', ['#b3a88f', '#cfc5ad', '#a89e86'], 2200, 3, 11);
     kies.repeat.set(plan.laenge / 6, 0.6);
-    const weg = new THREE.Mesh(new THREE.PlaneGeometry(plan.laenge + 30, 3.4), matt(0xffffff, kies));
+    const weg = new THREE.Mesh(new THREE.PlaneGeometry(plan.laenge + 30, 3.4), pbrMaterial(0xffffff, 'schotter', kies));
     weg.rotation.x = -Math.PI / 2;
     weg.position.set(0, 0.02, D + 8.2);
     weg.userData.wirftSchatten = false;
@@ -393,7 +391,7 @@ export class Welt {
     }, true);
     ziegel.repeat.set(5, 2);
     const haus = new THREE.Group();
-    haus.add(quader(9, 3.4, 6, matt(0xffffff, ziegel), 0, 1.7, 0));
+    haus.add(quader(9, 3.4, 6, pbrMaterial(0xffffff, 'ziegel', ziegel), 0, 1.7, 0));
     haus.add(quader(10.6, 2.9, 7.4, matt(0xe9e2cf), 0, 4.85, 0));
     const glas = new THREE.MeshStandardMaterial({ color: 0x27414f, roughness: 0.12, metalness: 0.5 });
     const band = new THREE.Mesh(new THREE.PlaneGeometry(9.6, 1.5), glas);
@@ -445,7 +443,7 @@ export class Welt {
     }, true);
     bretter.repeat.set(8, 1);
     const schuppen = new THREE.Group();
-    schuppen.add(quader(16, 4.2, 7, matt(0xffffff, bretter), 0, 2.1 + 1.1, 0));
+    schuppen.add(quader(16, 4.2, 7, pbrMaterial(0xffffff, 'holz', bretter), 0, 2.1 + 1.1, 0));
     const dach = satteldach(17.2, 8.4, 2.2, matt(0x5a5f63));
     dach.position.y = 5.3;
     schuppen.add(dach);
@@ -581,7 +579,6 @@ export class Welt {
     const b = Math.max(1, Math.floor(feld.width));
     const h = Math.max(1, Math.floor(feld.height));
     this.zeichner.setSize(b, h, false);
-    this.volumenlicht?.passeGroesseAn();
     this.pathtracing?.passeGroesseAn();
     this.kamera.aspect = b / h;
     this.kamera.updateProjectionMatrix();
@@ -589,10 +586,9 @@ export class Welt {
 
   zeichne() {
     if (this.pathtracingAktiv && this.pathtracing) {
-      this.pathtracing.zeichne(this.szene, this.kamera, this.sonne, this.volumenlichtAktiv);
-    } else if (this.volumenlichtAktiv) {
-      this.volumenlicht.zeichne(this.szene, this.kamera, this.sonne);
+      this.pathtracing.zeichne(this.szene, this.kamera, this.sonne);
     } else {
+      reliefAktiv.value = this.raymarchingAktiv;
       this.zeichner.render(this.szene, this.kamera);
     }
   }

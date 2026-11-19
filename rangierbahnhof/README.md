@@ -62,10 +62,13 @@ bei Fehlern einen Hinweis mit Zeilennummer.
 mit der rechten Maustaste verschiebt. Oben rechts gibt es drei feste
 Blickwinkel.
 
-**Volumenlicht.** Raymarching berechnet den bodennahen Nebel und das darin
-gestreute Sonnenlicht. Gebäude und Fahrzeuge werfen Schatten in den Nebel.
-Der Schalter **Volumenlicht** blendet den Effekt aus und ein, wenn der
-Browser ihn unterstützt.
+**Raymarching.** Der Schalter aktiviert Parallax Occlusion Mapping. Der
+Shader folgt dem Blickstrahl durch die Tiefenkarte und versetzt die
+Materialtexturen am gefundenen Schnittpunkt. So wirkt das Relief von
+Schotter, Fugen und Holz aus schrägen Blickwinkeln räumlich. Die
+Mesh-Silhouetten und Schattenumrisse ändern sich dabei nicht.
+Gras, Schotter, Ziegel, Holz und Stahl nutzen PBR-Texturen mit
+Farb-, Normal-, Rauheits- und Metallwerten.
 
 ## Wenn etwas nicht klappt
 
@@ -80,9 +83,9 @@ Browser ihn unterstützt.
 Der Schalter **Pathtracing** aktiviert einen progressiven WebGL2-Renderer.
 Bei ruhender Kamera verfeinert sich das zunächst körnige Bild mit jedem Frame.
 Kamera-, Fahrzeug-, Material- und Größenänderungen starten die Akkumulation neu.
-Der Schalterzustand wird lokal gespeichert. Standardmäßig bleibt der bisherige
-Renderer aktiv. **Volumenlicht** schaltet in beiden Renderern den Bodennebel um.
-Die Schalter erscheinen auf GPUs mit `EXT_color_buffer_float`.
+Die Auswahl wird lokal gespeichert. Ohne Auswahl läuft der Rasterrenderer.
+Pathtracing setzt `EXT_color_buffer_float` voraus. Raymarching und Pathtracing
+sind getrennte Ansichtsmodi.
 
 Der Pathtracer berechnet Dreieckschnittpunkte über eine BVH, direkte Sonne mit
 weichen Schatten, Himmelslicht, emissive Materialien und bis zu fünf Pfadsegmente
@@ -92,8 +95,8 @@ bestehenden Szene. Bewegte Geometrie aktualisiert die BVH, ohne sie neu aufzubau
 Die interne Auflösung ist auf 960 × 540 Pixel begrenzt. Es gibt keinen Denoiser;
 mehr Samples reduzieren das Rauschen. Die Geschwindigkeit hängt stark von der GPU ab.
 Schilder, Waggonnummern als Sprites und Gleismarkierungen bleiben lesbare Overlays;
-sie sind nicht Teil der Lichtsimulation. Transparenz, Normalmaps und physikalische
-Glasbrechung werden nicht simuliert. Der Nebel wird auf dem Kamerastrahl integriert.
+sie sind nicht Teil der Lichtsimulation. Der Pathtracer verwendet bei PBR-Materialien
+auch die Texturen für Normalen, Rauheit und Metallanteil. Transparenz und Glasbrechung werden nicht simuliert.
 
 ### Browsertest
 
@@ -113,7 +116,7 @@ rangierbahnhof/src/main/resources/web` aus dem Repository-Ordner ausliefern;
 wird nur für diesen Test benötigt, nicht zum Starten des Projekts.
 
 Der Test prüft Shaderfehler, endliche und sichtbare GPU-Ausgabe, Akkumulation,
-Rücksetzung bei Kamera-, Lok- und Nebeländerungen, Wiederverwendung von BVH und
-Atlas sowie das Umschalten beider Renderer. Er nutzt für Software-WebGL eine
-reduzierte Auflösung von 160 × 90 Pixeln. Die Beurteilung von Bildqualität und
+Rücksetzung bei Kamera- und Lokänderungen, Wiederverwendung von BVH und
+Atlas sowie den Ansichtswechsel und die sichtbaren Pixeländerungen durch das Relief.
+Der Pathtracing-Test läuft mit Software-WebGL bei 160 × 90 Pixeln. Die Beurteilung von Bildqualität und
 GPU-Leistung bei voller Auflösung erfolgt zusätzlich interaktiv im Browser.

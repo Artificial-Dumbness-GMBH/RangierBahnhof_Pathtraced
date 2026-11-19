@@ -10,7 +10,6 @@ uniform mat4 inverseProjektion, kameraWelt;
 uniform vec2 aufloesung;
 uniform vec3 sonnenRichtung, sonnenFarbe;
 uniform float samples, saat;
-uniform bool nebelAktiv;
 uint rng;
 float zufall() {
   rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
@@ -60,6 +59,10 @@ vec3 halbkugel(vec3 n) {
   return normalize(t*(r*cos(phi))+cross(n,t)*(r*sin(phi))+n*sqrt(1.0-r*r));
 }
 vec3 himmel(vec3 d) { return mix(vec3(0.72,0.83,0.91),vec3(0.22,0.45,0.72),sqrt(max(d.y,0.0))); }
+vec3 atlasProbe(float index, float raster, vec2 uv) {
+  vec2 tile = vec2(mod(index,raster),floor(index/raster));
+  return texture(atlas,(tile*258.0+1.5+uv*255.0)/(raster*258.0)).rgb;
+}
 void main() {
   rng = uint(gl_FragCoord.x)*1973u + uint(gl_FragCoord.y)*9277u + uint(saat)*26699u + 1u;
   vec2 uv = bildUv + (vec2(zufall(),zufall())-0.5)/aufloesung;
@@ -68,51 +71,46 @@ void main() {
   vec3 licht=vec3(0), gewicht=vec3(1);
   for (int bounce=0; bounce<5; bounce++) {
     float l; vec2 bary; int hit=treffer(o,d,l,bary,false);
-    // Bodennaher Nebel auf dem Kamerastrahl, mit geometrischen Sonnenschatten.
-    if (bounce==0 && nebelAktiv) {
-      float start=0.0, ende=min(l,240.0);
-      if (abs(d.y)>0.0001) {
-        float a=-o.y/d.y, b=(21.0-o.y)/d.y;
-        start=max(start,min(a,b)); ende=min(ende,max(a,b));
-      } else if (o.y<0.0 || o.y>21.0) ende=0.0;
-      if (ende>start) {
-        float schritt=(ende-start)/12.0;
-        float offset=zufall();
-        for(int j=0;j<12;j++) {
-          vec3 p=o+d*(start+(float(j)+offset)*schritt);
-          float rho=(0.037+0.01*sin(p.x*0.1+p.z*0.15)*sin(p.z*0.21-p.x*0.04))*exp(-0.17*p.y);
-          float tau=exp(-rho*(1.0-smoothstep(12.0,21.0,p.y))*schritt);
-          float sl; vec2 sb;
-          float sicht=treffer(p,sonnenRichtung,sl,sb,true)<0 ? 1.0 : 0.0;
-          licht+=gewicht*(1.0-tau)*(vec3(0.24,0.36,0.49)+sonnenFarbe/2.9*sicht*(0.55+0.75*pow(0.5+0.5*dot(d,sonnenRichtung),4.0)));
-          gewicht*=tau;
-        }
-      }
-    }
     if(hit<0) { licht+=gewicht*himmel(d); break; }
     int t=hit*11;
     vec3 n=normalize(daten(dreiecke,t+3).xyz*(1.0-bary.x-bary.y)+daten(dreiecke,t+4).xyz*bary.x+daten(dreiecke,t+5).xyz*bary.y);
     if(dot(n,d)>0.0) n=-n;
     vec4 farbe=daten(dreiecke,t+8), emission=daten(dreiecke,t+9), karte=daten(dreiecke,t+10);
     vec3 albedo=farbe.rgb;
-    vec3 emissiv=emission.rgb;
-    if(karte.x>=0.0) {
-      vec4 ab=daten(dreiecke,t+6); vec2 c=daten(dreiecke,t+7).xy;
-      vec2 texUv=ab.xy*(1.0-bary.x-bary.y)+ab.zw*bary.x+c*bary.y;
-      texUv=mix(clamp(texUv,0.0,1.0),fract(texUv),karte.zw);
-      float raster=karte.y;
-      vec2 tile=vec2(mod(karte.x,raster),floor(karte.x/raster));
-      // Ein Pixel Rand pro Kachel verhindert Überbluten benachbarter Karten.
-      vec2 atlasUv=(tile*258.0+1.0+texUv*255.0+0.5)/(raster*258.0);
-      vec3 s=texture(atlas,atlasUv).rgb;
-      vec3 texel=mix(s/12.92,pow((s+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),s));
-      albedo*=texel;
-    }
-    licht+=gewicht*emissiv;
-    vec3 p=o+d*l+n*0.003;
-    // Diffuse/reflektierende Mischung; die Auswahlwahrscheinlichkeit kürzt
-    // sich mit dem jeweiligen BRDF-Gewicht heraus.
     float metall=farbe.a, rau=emission.a;
+    vec3 hitNormal=n;
+    if(karte.x>=0.0) {
+      vec4 ab=daten(dreiecke,t+6), c=daten(dreiecke,t+7);
+      vec2 texUv=ab.xy*(1.0-bary.x-bary.y)+ab.zw*bary.x+c.xy*bary.y;
+      texUv=mix(clamp(texUv,0.0,1.0),fract(texUv),karte.zw);
+      vec3 s=atlasProbe(karte.x,karte.y,texUv);
+      albedo*=mix(s/12.92,pow((s+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),s));
+      if (c.z>=0.0) {
+        vec3 eigenschaften=atlasProbe(c.z,karte.y,texUv);
+        rau*=eigenschaften.g;
+        metall*=eigenschaften.b;
+      }
+      if (c.w>=0.0) {
+        vec2 uv1=ab.zw-ab.xy, uv2=c.xy-ab.xy;
+        vec3 e1=daten(dreiecke,t+1).xyz-daten(dreiecke,t).xyz;
+        vec3 e2=daten(dreiecke,t+2).xyz-daten(dreiecke,t).xyz;
+        float det=uv1.x*uv2.y-uv1.y*uv2.x;
+        vec3 tng=(e1*uv2.y-e2*uv1.y)*sign(det);
+        tng-=n*dot(n,tng);
+        if (dot(tng,tng)>1e-12) {
+          tng=normalize(tng);
+          vec3 bit=normalize(cross(n,tng));
+          // Der Atlas speichert Canvas-Pixel von oben nach unten.
+          bit*= -sign(dot(bit,(e2*uv1.x-e1*uv2.x)*sign(det)));
+          vec3 norm=atlasProbe(c.w,karte.y,texUv)*2.0-1.0;
+          vec3 perturbed=normalize(mat3(tng,bit,n)*norm);
+          if (dot(perturbed,d)<0.0) n=perturbed;
+        }
+      }
+    }
+    licht+=gewicht*emission.rgb;
+    vec3 p=o+d*l+hitNormal*0.003;
+    // Die Auswahlwahrscheinlichkeit kürzt sich mit dem BRDF-Gewicht heraus.
     float fresnel=0.04+0.96*pow(1.0-max(dot(-d,n),0.0),5.0);
     float spiegel=mix(fresnel,1.0,metall);
     if(zufall()<spiegel) {
@@ -167,7 +165,7 @@ export class Pathtracing {
       inverseProjektion: { value: null }, kameraWelt: { value: null },
       aufloesung: { value: new THREE.Vector2(1, 1) },
       sonnenRichtung: { value: new THREE.Vector3() }, sonnenFarbe: { value: new THREE.Color() },
-      samples: { value: 0 }, saat: { value: 0 }, nebelAktiv: { value: false },
+      samples: { value: 0 }, saat: { value: 0 },
     };
     this.kamera = new THREE.Camera();
     this.szene = new THREE.Scene();
@@ -210,11 +208,12 @@ export class Pathtracing {
       o.geometry.attributes.uv?.version, o.geometry.index?.version, o.geometry.drawRange.start, o.geometry.drawRange.count,
       ...o.matrixWorld.elements, o.count ?? '', o.instanceMatrix?.version ?? '', o.instanceColor?.version ?? '',
       ...(Array.isArray(o.material) ? o.material : [o.material]).flatMap(m =>
-        [m.uuid, m.visible, m.color?.getHex(), m.emissive?.getHex(), m.emissiveIntensity, m.roughness, m.metalness, m.opacity, m.map?.version, m.map?.repeat.toArray(), m.map?.offset.toArray(), m.map?.rotation])].join(','));
+        [m.uuid, m.visible, m.color?.getHex(), m.emissive?.getHex(), m.emissiveIntensity, m.roughness, m.metalness, m.opacity, m.map?.uuid, m.map?.version, m.roughnessMap?.uuid, m.roughnessMap?.version, m.normalMap?.uuid, m.normalMap?.version, m.map?.repeat.toArray(), m.map?.offset.toArray(), m.map?.rotation])].join(','));
     const signatur = schluessel.join(';');
     if (signatur === this.signatur) return false;
     this.signatur = signatur;
-    const maps = [...new Set(meshes.flatMap(o => (Array.isArray(o.material) ? o.material : [o.material]).map(m => m.map).filter(m => m?.image)))];
+    const maps = [...new Set(meshes.flatMap(o => (Array.isArray(o.material) ? o.material : [o.material])
+      .flatMap(m => [m.map, m.roughnessMap, m.normalMap]).filter(m => m?.image)))];
     if (maps.length !== this.maps.length || maps.some((m,i) => m !== this.maps[i])) this.meshCache.clear();
     this.maps = maps;
     const dreiecke = [];
@@ -243,8 +242,10 @@ export class Pathtracing {
           const t = new Float32Array(44);
           farbe.copy(m.color ?? instanzFarbe).multiply(instanzFarbe);
           const map = m.map;
-          let mapId = -1;
-          if (map?.image) { mapId = maps.indexOf(map); if (mapId < 0) { mapId = maps.length; maps.push(map); } map.updateMatrix(); }
+          const mapId = maps.indexOf(map);
+          if (mapId >= 0) map.updateMatrix();
+          t[30] = maps.indexOf(m.roughnessMap);
+          t[31] = maps.indexOf(m.normalMap);
           for (let j = 0; j < 3; j++) {
             const index = g.index ? g.index.getX(i+j) : i+j;
             v.fromBufferAttribute(pos,index).applyMatrix4(matrix).toArray(t,j*4);
@@ -346,18 +347,18 @@ export class Pathtracing {
     return true;
   }
 
-  zeichne(szene,kamera,sonne,nebel) {
+  zeichne(szene,kamera,sonne) {
     const geaendert=this.aktualisiere(szene);
     kamera.updateMatrixWorld();
     const ansicht=[...kamera.matrixWorld.elements,...kamera.projectionMatrix.elements,
-      ...sonne.position.toArray(),...sonne.target.position.toArray(),sonne.color.getHex(),sonne.intensity,nebel].join(',');
+      ...sonne.position.toArray(),...sonne.target.position.toArray(),sonne.color.getHex(),sonne.intensity].join(',');
     if(geaendert || ansicht!==this.ansicht) this.samples=0;
     this.ansicht=ansicht;
     const u=this.uniforms;
     u.inverseProjektion.value=kamera.projectionMatrixInverse; u.kameraWelt.value=kamera.matrixWorld;
     u.sonnenRichtung.value.subVectors(sonne.position,sonne.target.position).normalize();
     u.sonnenFarbe.value.copy(sonne.color).multiplyScalar(sonne.intensity);
-    u.nebelAktiv.value=nebel; u.samples.value=this.samples; u.saat.value=++this.saat;
+    u.samples.value=this.samples; u.saat.value=++this.saat;
     const ziel=this.ziele[1], vorher=this.ziele[0]; u.vorher.value=vorher.texture;
     try {
       this.quad.material=this.material;

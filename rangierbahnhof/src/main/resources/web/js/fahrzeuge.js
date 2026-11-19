@@ -4,6 +4,7 @@
 // keine Bilddateien. Die Modelle zeigen mit +x zum Ausziehgleis.
 
 import * as THREE from './lib/three.module.js';
+import { pbrMaterial } from './pbr.js';
 import { MASSE } from './gleisplan.js';
 
 const Y0 = MASSE.SCHIENE_OBEN;
@@ -43,7 +44,7 @@ function stoff(farbe, rauheit = 0.75, metall = 0.05, karte = null) {
 }
 
 const matDunkel = () => einmal('dunkel', () => stoff(0x26282a, 0.8, 0.2));
-const matStahl = () => einmal('stahl', () => stoff(0x8b9095, 0.45, 0.5));
+const matStahl = () => einmal('stahl', () => pbrMaterial(0x8b9095, 'stahl'));
 const matGlas = () => einmal('glas', () => stoff(0x1b2a33, 0.15, 0.4));
 
 /** Eine eigene Kachelung einer gemeinsam genutzten Oberfläche. */
