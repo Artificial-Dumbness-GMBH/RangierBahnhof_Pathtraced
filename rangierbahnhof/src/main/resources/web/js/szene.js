@@ -134,6 +134,7 @@ export class Welt {
     boden.rotation.x = -Math.PI / 2;
     boden.receiveShadow = true;
     this.szene.add(boden);
+    this.boden = boden;
 
     this.haloTextur = textur(64, 64, (ctx) => {
       const verlauf = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -160,6 +161,7 @@ export class Welt {
       this.szene.remove(this.anlage);
       this.anlage.traverse((o) => {
         if (o.geometry) o.geometry.dispose();
+        if (o.isInstancedMesh) o.dispose();
         if (o.isSpotLight) o.shadow.dispose();
         if (o.userData.lichtHalo) o.material.dispose();
         if (o.userData.depotSchild) {
@@ -169,6 +171,13 @@ export class Welt {
       });
     }
     this.plan = plan;
+    this.kamera.far = Math.max(1800, plan.laenge * 12);
+    this.kamera.updateProjectionMatrix();
+    this.boden.scale.x = Math.max(1, (plan.laenge + 160) / 1700);
+    const { map, normalMap, roughnessMap } = this.boden.material;
+    for (const karte of [map, normalMap, roughnessMap]) {
+      karte.repeat.x = 170 * this.boden.scale.x;
+    }
     this.schilder = [];
     this.lichtquellen = [];
     const g = new THREE.Group();
@@ -265,9 +274,11 @@ export class Welt {
     const index = [];
     const x0 = plan.xPrellbock - 4.5;
     const x1 = plan.xEnde + 3.5;
-    const spalten = Math.ceil(x1 - x0);
-    for (let i = 0; i <= spalten; i++) {
-      const x = x0 + (x1 - x0) * (i / spalten);
+    const xStart = plan.gross ? plan.xKurve : x0;
+    const spalten = Math.ceil(x1 - xStart);
+    const xs = Array.from({ length: spalten + 1 }, (_, i) => xStart + (x1 - xStart) * i / spalten);
+    if (plan.gross) xs.unshift(x0);
+    for (const [i, x] of xs.entries()) {
       const hinten = plan.zVon('A', x) - 2.5;
       const vorn = plan.zVon('C', x) + 2.5;
       const reihe = [[hinten - 0.6, 0.01], [hinten, 0.15], [vorn, 0.15], [vorn + 0.6, 0.01]];
@@ -295,8 +306,7 @@ export class Welt {
 
   baueSchwellen(g, plan) {
     const eintraege = [];
-    const abstand = 0.64;
-    for (let x = plan.xPrellbock + 0.3; x < plan.xEnde - 0.2; x += abstand) {
+    for (let x = plan.xPrellbock + 0.3; x < plan.xEnde - 0.2; x += plan.gross && x < plan.xKurve ? 2.5 : 0.64) {
       const versatz = Math.abs(plan.zVon('A', x));
       if (x >= plan.xWeiche) {
         eintraege.push([x, 0, 0, 1]);
@@ -330,9 +340,8 @@ export class Welt {
     const schritt = 0.5;
     for (const gleis of GLEISE) {
       const bis = gleis === 'B' ? plan.xEnde : plan.xWeiche;
-      for (let x = plan.xPrellbock; x < bis - 1e-6; x += schritt) {
-        const xa = x;
-        const xb = Math.min(bis, x + schritt);
+      for (let xa = plan.xPrellbock; xa < bis - 1e-6;) {
+        const xb = plan.gross && xa < plan.xKurve ? plan.xKurve : Math.min(bis, xa + schritt);
         const za = plan.zVon(gleis, xa);
         const zb = plan.zVon(gleis, xb);
         const laenge = Math.hypot(xb - xa, zb - za);
@@ -342,9 +351,10 @@ export class Welt {
           eintraege.push([
             (xa + xb) / 2 - dz * seite * MASSE.SPUR / 2,
             (za + zb) / 2 + dx * seite * MASSE.SPUR / 2,
-            Math.atan2(-dz, dx), laenge * 1.04,
+            Math.atan2(-dz, dx), laenge + Math.min(0.025, laenge * 0.04),
           ]);
         }
+        xa = xb;
       }
     }
     const stahl = pbrMaterial(0x9a9792, 'stahl');
@@ -575,7 +585,8 @@ export class Welt {
   baueBaeume(g, plan) {
     const r = zufall(plan.kapazitaet * 97 + 5);
     const orte = [];
-    for (let x = plan.xPrellbock - 46; x < plan.xEnde + 46; x += 7.5) {
+    const abstand = plan.gross ? Math.max(7.5, plan.laenge / 85) : 7.5;
+    for (let x = plan.xPrellbock - 46; x < plan.xEnde + 46; x += abstand) {
       orte.push([x + r() * 5, -(D + 25) - r() * 12]);
       if (r() > 0.35) orte.push([x + r() * 6, -(D + 42) - r() * 30]);
     }
@@ -633,17 +644,22 @@ export class Welt {
   }
 
   /** Welches Gleis liegt unter dem Bildschirmpunkt? null, wenn keines. */
-  gleisBei(clientX, clientY, waggons) {
+  gleisBei(clientX, clientY, waggons, flotte) {
     const feld = this.leinwand.getBoundingClientRect();
     const punkt = new THREE.Vector2(
       ((clientX - feld.left) / feld.width) * 2 - 1,
       -((clientY - feld.top) / feld.height) * 2 + 1);
     this.strahl.setFromCamera(punkt, this.kamera);
-    const treffer = this.strahl.intersectObjects(waggons.map((w) => w.gruppe), true);
-    if (treffer.length > 0) {
-      let o = treffer[0].object;
-      while (o && !o.userData.waggon) o = o.parent;
-      if (o) return o.userData.waggon.gleis ?? null;
+    if (flotte) {
+      const [treffer] = this.strahl.intersectObject(flotte.aufbauten, false);
+      if (treffer) return waggons[treffer.instanceId].gleis ?? null;
+    } else {
+      const [treffer] = this.strahl.intersectObjects(waggons.map((w) => w.gruppe), true);
+      if (treffer) {
+        let o = treffer.object;
+        while (o && !o.userData.waggon) o = o.parent;
+        if (o) return o.userData.waggon.gleis ?? null;
+      }
     }
     const boden = this.strahl.intersectObjects(GLEISE.map((name) => this.flaechen[name]), false);
     return boden.length > 0 ? boden[0].object.userData.gleis : null;

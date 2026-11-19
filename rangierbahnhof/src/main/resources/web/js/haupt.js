@@ -9,7 +9,7 @@
 import * as THREE from './lib/three.module.js';
 import { Gleisplan, GLEISE, MASSE } from './gleisplan.js';
 import { Welt } from './szene.js';
-import { Lok, Waggon, farbeVon } from './fahrzeuge.js';
+import { Lok, Waggon, WaggonFlotte, WaggonUebersicht, farbeVon } from './fahrzeuge.js';
 import { Dampfbetrieb } from './dampfbetrieb.js';
 import { Rangierbetrieb } from './rangierfahrt.js';
 import { Kamerafuehrung } from './kamera.js';
@@ -24,7 +24,8 @@ const dampfbetrieb = new Dampfbetrieb(lok, welt, erinnere('dampflok'), (stand) =
 
 let sortierAnfrage = 0;
 
-const waggonLager = new Map();   // Nummer -> Waggon (wird wiederverwendet)
+const detailWaggons = new Map(); // Nummer -> detailliertes Modell
+let waggonLager = new Map();    // Nummer -> aktuell aufgestellter Waggon
 
 const zustand = {
   modus: 'hand',
@@ -32,9 +33,11 @@ const zustand = {
   plan: null,
   betrieb: null,
   waggons: [],
+  flotte: null,
   logisch: { A: [], B: [], C: [] },
   zaehler: 0,
   gewaehlt: null,
+  gewaehlterWaggon: null,
   schwebend: null,
   geschafft: false,
   laeuft: true,
@@ -59,7 +62,7 @@ function erinnere(name) {
 // ------------------------------------------------------------ Aufstellen
 
 function wuerfle(anzahl) {
-  const alle = Array.from({ length: 100 }, (_, i) => i + 1);
+  const alle = Array.from({ length: Math.max(100, anzahl) }, (_, i) => i + 1);
   let nummern;
   do {
     for (let i = alle.length - 1; i > 0; i--) {
@@ -74,26 +77,45 @@ function wuerfle(anzahl) {
 /** Baut den Bahnhof für eine Startbelegung (Nummern vom Prellbock nach vorne). */
 function baueAuf(start) {
   zustand.start = [...start];
+  zustand.gewaehlterWaggon?.setzeAuswahl(false);
+  zustand.gewaehlterWaggon = null;
+  for (const w of zustand.waggons) welt.fahrzeuge.remove(w.gruppe);
   const neuePlanung = !zustand.plan || zustand.plan.kapazitaet !== start.length;
   if (neuePlanung) {
     zustand.plan = new Gleisplan(start.length);
     welt.baue(zustand.plan);
+    kamera.maximalerAbstand = zustand.plan.gross ? welt.kamera.far * 0.9 : 420;
     welt.fuelleDepot(dampfbetrieb.faesser);
     zustand.betrieb = new Rangierbetrieb(zustand.plan, lok, welt);
-  }
-  for (const w of zustand.waggons) welt.fahrzeuge.remove(w.gruppe);
-  zustand.waggons = start.map((nummer) => {
-    if (!waggonLager.has(nummer)) {
-      const w = new Waggon(nummer);
-      w.gruppe.userData.waggon = w;
-      waggonLager.set(nummer, w);
+    if (zustand.flotte) {
+      welt.fahrzeuge.remove(zustand.flotte.gruppe);
+      zustand.flotte.entsorge();
     }
-    const w = waggonLager.get(nummer);
-    welt.fahrzeuge.add(w.gruppe);
+    zustand.flotte = zustand.plan.gross ? new WaggonFlotte(zustand.plan) : null;
+    if (zustand.flotte) welt.fahrzeuge.add(zustand.flotte.gruppe);
+    waehleRenderer(gemerkterRenderer);
+  }
+  waggonLager = new Map();
+  zustand.waggons = start.map((nummer, index) => {
+    let w;
+    if (zustand.flotte) {
+      w = new WaggonUebersicht(nummer, zustand.flotte, index);
+    } else {
+      if (!detailWaggons.has(nummer)) {
+        const modell = new Waggon(nummer);
+        modell.gruppe.userData.waggon = modell;
+        detailWaggons.set(nummer, modell);
+      }
+      w = detailWaggons.get(nummer);
+      welt.fahrzeuge.add(w.gruppe);
+    }
+    waggonLager.set(nummer, w);
     return w;
   });
   stelleStartHer();
-  if (neuePlanung) stelleKameraEin(zustand.kameraArt === 'lok' ? 'uebersicht' : zustand.kameraArt, 0.01);
+  if (neuePlanung && zustand.kameraArt !== 'frei') {
+    stelleKameraEin(zustand.kameraArt, 0.01);
+  }
 }
 
 /** Setzt alles auf die Startbelegung zurück. */
@@ -143,16 +165,10 @@ function istSortiert() {
 // ------------------------------------------------------ Selbst rangieren
 
 function waehle(gleis) {
-  if (zustand.gewaehlt) {
-    const alt = zustand.logisch[zustand.gewaehlt];
-    if (alt.length > 0) waggonLager.get(alt[alt.length - 1]).setzeAuswahl(false);
-  }
-  for (const w of zustand.waggons) w.setzeAuswahl(false);
+  zustand.gewaehlterWaggon?.setzeAuswahl(false);
   zustand.gewaehlt = gleis;
-  if (gleis) {
-    const reihe = zustand.logisch[gleis];
-    waggonLager.get(reihe[reihe.length - 1]).setzeAuswahl(true);
-  }
+  zustand.gewaehlterWaggon = gleis ? waggonLager.get(zustand.logisch[gleis].at(-1)) : null;
+  zustand.gewaehlterWaggon?.setzeAuswahl(true);
   zeichneGleisbild();
 }
 
@@ -307,7 +323,16 @@ function zeichneGleisbild() {
     const { knopf, strecke } = reihen[gleis];
     const nummern = zustand.logisch[gleis];
     strecke.replaceChildren();
-    for (const nummer of nummern) {
+    const sichtbar = zustand.plan.gross ? nummern.slice(-3) : nummern;
+    const weitere = nummern.length - sichtbar.length;
+    if (weitere > 0) {
+      const mehr = document.createElement('span');
+      mehr.className = 'gleismenge';
+      mehr.textContent = `+${weitere}`;
+      mehr.title = `${weitere} weitere Waggons Richtung Prellbock`;
+      strecke.append(mehr);
+    }
+    for (const nummer of sichtbar) {
       const chip = document.createElement('span');
       chip.className = 'chip';
       chip.style.background = farbeVon(nummer);
@@ -320,7 +345,9 @@ function zeichneGleisbild() {
     strecke.append(marke);
     knopf.classList.toggle('gewaehlt', zustand.gewaehlt === gleis);
     knopf.disabled = zustand.modus !== 'hand' || !dampfbetrieb.fahrbereit;
-    const inhalt = nummern.length > 0 ? `Waggons ${nummern.join(', ')} (vom Prellbock nach vorne)` : 'leer';
+    const inhalt = weitere > 0
+      ? `${nummern.length} Waggons. Vorne: ${sichtbar.join(', ')}`
+      : nummern.length > 0 ? `Waggons ${nummern.join(', ')} (vom Prellbock nach vorne)` : 'leer';
     knopf.setAttribute('aria-label', `Gleis ${gleis}: ${inhalt}`);
   }
 }
@@ -423,7 +450,7 @@ kamera.beiEingriff = (was) => {
 };
 
 kamera.beiKlick = (e) => {
-  const gleis = welt.gleisBei(e.clientX, e.clientY, zustand.waggons);
+  const gleis = welt.gleisBei(e.clientX, e.clientY, zustand.waggons, zustand.flotte);
   if (gleis) klickeGleis(gleis);
 };
 
@@ -435,7 +462,7 @@ kamera.beiBewegung = (e, zieht) => {
     flaeche.classList.remove('zeigt');
     return;
   }
-  zustand.schwebend = welt.gleisBei(e.clientX, e.clientY, zustand.waggons);
+  zustand.schwebend = welt.gleisBei(e.clientX, e.clientY, zustand.waggons, zustand.flotte);
   flaeche.classList.toggle('zeigt', zustand.schwebend !== null);
 };
 
@@ -469,7 +496,10 @@ async function pruefeVerbindung() {
 // ---------------------------------------------------------------- Tempo
 
 function setzeTempo(regler) {
-  zustand.tempo = 0.5 * Math.pow(32, regler / 100);
+  // Bis zur bisherigen Standardstellung bleibt 2× am selben Reglerpunkt.
+  zustand.tempo = regler <= 45
+    ? 0.5 * Math.pow(4, regler / 45)
+    : 2 * Math.pow(50, (regler - 45) / 55);
   const zahl = zustand.tempo >= 10 ? Math.round(zustand.tempo) : Math.round(zustand.tempo * 10) / 10;
   $('tempoWert').textContent = String(zahl).replace('.', ',') + '×';
 }
@@ -546,9 +576,12 @@ for (const knopf of document.querySelectorAll('[data-kamera]')) {
 
 const pathKnopf = $('pathtracing');
 const rayKnopf = $('raymarching');
-const gemerkterRenderer = erinnere('renderer') ?? (erinnere('pathtracing') === 'true' ? 'pathtracing' : '');
+let gemerkterRenderer = erinnere('renderer') ?? (erinnere('pathtracing') === 'true' ? 'pathtracing' : '');
 function waehleRenderer(renderer) {
-  welt.pathtracingAktiv = renderer === 'pathtracing' && Boolean(welt.pathtracing);
+  const grossesGleisbild = Boolean(zustand.plan?.gross);
+  pathKnopf.disabled = grossesGleisbild;
+  pathKnopf.title = grossesGleisbild ? 'Pathtracing ist bei bis zu 10 Waggons verfügbar' : '';
+  welt.pathtracingAktiv = renderer === 'pathtracing' && Boolean(welt.pathtracing) && !grossesGleisbild;
   welt.raymarchingAktiv = renderer === 'raymarching';
   if (welt.pathtracing) welt.pathtracing.samples = 0;
   pathKnopf.setAttribute('aria-pressed', String(welt.pathtracingAktiv));
@@ -559,6 +592,7 @@ pathKnopf.hidden = !welt.pathtracing;
 for (const knopf of [pathKnopf, rayKnopf]) {
   knopf.addEventListener('click', () => {
     const wahl = knopf.getAttribute('aria-pressed') === 'true' ? '' : knopf.id;
+    gemerkterRenderer = wahl;
     waehleRenderer(wahl);
     merke('renderer', wahl);
   });
@@ -600,8 +634,10 @@ baueGleisbild();
 zeichneCheckliste(null);
 welt.passeGroesseAn();
 
-const gemerkteAnzahl = Number(erinnere('anzahl'));
-if (gemerkteAnzahl >= 3 && gemerkteAnzahl <= 9) $('anzahl').value = String(gemerkteAnzahl);
+const gemerkteAnzahl = erinnere('anzahl');
+if ([...$('anzahl').options].some((option) => option.value === gemerkteAnzahl)) {
+  $('anzahl').value = gemerkteAnzahl;
+}
 const gemerktesTempo = erinnere('tempo');
 if (gemerktesTempo !== null && gemerktesTempo !== '') $('tempo').value = gemerktesTempo;
 setzeTempo(Number($('tempo').value));

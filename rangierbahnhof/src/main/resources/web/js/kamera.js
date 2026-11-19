@@ -12,6 +12,7 @@ export class Kamerafuehrung {
     this.flaeche = flaeche;
     this.ziel = new THREE.Vector3(0, 1, 0);
     this.abstand = 120;
+    this.maximalerAbstand = 420;
     this.neigung = 58 * GRAD;   // 0 = senkrecht von oben
     this.drehung = 0;           // 0 = Blick von vorne (aus +z)
     this.fahrt = null;          // sanfter Übergang zu einer Voreinstellung
@@ -37,6 +38,11 @@ export class Kamerafuehrung {
       this.ziel.y + this.abstand * Math.cos(this.neigung),
       this.ziel.z + this.abstand * s * Math.cos(this.drehung));
     this.kamera.lookAt(this.ziel);
+    const nah = Math.max(1, this.abstand / 1500);
+    if (this.kamera.near !== nah) {
+      this.kamera.near = nah;
+      this.kamera.updateProjectionMatrix();
+    }
   }
 
   /** Fährt sanft zu einer neuen Einstellung. */
@@ -58,7 +64,7 @@ export class Kamerafuehrung {
     const n = neigung * GRAD;
     const d = drehung * GRAD;
     let nah = 10;
-    let fern = 700;
+    let fern = Math.max(700, this.maximalerAbstand);
     for (let i = 0; i < 24; i++) {
       const mitte = (nah + fern) / 2;
       probe.position.set(
@@ -69,7 +75,7 @@ export class Kamerafuehrung {
       probe.updateMatrixWorld(true);
       const passt = punkte.every((p) => {
         const v = p.clone().project(probe);
-        return v.z < 1 && v.x >= -1 + 2 * rand.links && v.x <= 1 - 2 * rand.rechts
+        return v.z > -1 && v.z < 1 && v.x >= -1 + 2 * rand.links && v.x <= 1 - 2 * rand.rechts
           && v.y >= -1 + 2 * rand.unten && v.y <= 1 - 2 * rand.oben;
       });
       if (passt) fern = mitte; else nah = mitte;
@@ -155,6 +161,8 @@ export class Kamerafuehrung {
   }
 
   zoome(faktor) {
-    this.abstand = Math.min(420, Math.max(14, this.abstand * faktor));
+    // Eine weit herausgezoomte Voreinstellung darf beim ersten Scrollen nicht springen.
+    const maximum = Math.max(this.abstand, this.maximalerAbstand);
+    this.abstand = Math.min(maximum, Math.max(14, this.abstand * faktor));
   }
 }

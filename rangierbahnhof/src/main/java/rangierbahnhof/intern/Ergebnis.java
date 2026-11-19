@@ -72,7 +72,7 @@ final class Ergebnis {
             if (i > 0) {
                 sb.append(',');
             }
-            sb.append(text(zuege.get(i)));
+            sb.append('"').append(zuege.get(i)).append('"');
         }
         sb.append("],\"ende\":");
         if (ende == null) {

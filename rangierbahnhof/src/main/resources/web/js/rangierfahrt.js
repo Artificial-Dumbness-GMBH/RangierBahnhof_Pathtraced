@@ -9,18 +9,21 @@
 //   4. Die Lok schiebt den Waggon auf Gleis Y, bis er am letzten Waggon (oder
 //      am Prellbock) steht, und kuppelt ab.
 
-import { GLEISE, MASSE } from './gleisplan.js';
+import { DETAILGRENZE, GLEISE, MASSE } from './gleisplan.js';
 
 const KUPPEL = (MASSE.TAKT + MASSE.LOK) / 2;                           // Abstand Lokmitte–Waggonmitte
 const U_LOK_FREI = MASSE.AUSZIEH - 1 - MASSE.LOK / 2;                 // Lok allein vor der Weiche
 const U_ZUG_FREI = MASSE.AUSZIEH - 1 - MASSE.TAKT - MASSE.LOK / 2;    // Lok mit Waggon vor der Weiche
-const TEMPO_MS = 42;                                                  // Fahrgeschwindigkeit bei Tempo 1
+const TEMPO_MS = 42;                                                 // Fahrgeschwindigkeit bei Tempo 1
+const REFERENZLAENGE = DETAILGRENZE * MASSE.TAKT + 4 + MASSE.WEICHE + MASSE.AUSZIEH;
 
 const glatt = (t) => t * t * (3 - 2 * t);
 
 export class Rangierbetrieb {
   constructor(plan, lok, welt) {
     this.plan = plan;
+    // Lange Gleise bleiben in der 3D-Wiedergabe in ähnlicher Zeit befahrbar.
+    this.fahrtempo = TEMPO_MS * Math.max(1, plan.laenge / REFERENZLAENGE);
     this.lok = lok;
     this.welt = welt;
     this.gleise = { A: [], B: [], C: [] };   // die sichtbar abgestellten Waggons
@@ -100,7 +103,7 @@ export class Rangierbetrieb {
     const a = { auftrag, waggon, teile: [], index: 0, gekuppelt: false };
     const fahrt = (gleis, start, ziel) => {
       if (Math.abs(ziel - start) < 0.01) return;
-      a.teile.push({ art: 'fahrt', gleis, von: start, nach: ziel, dauer: Math.max(0.25, Math.abs(ziel - start) / TEMPO_MS + 0.3) });
+      a.teile.push({ art: 'fahrt', gleis, von: start, nach: ziel, dauer: Math.max(0.25, Math.abs(ziel - start) / this.fahrtempo + 0.3) });
     };
     const weiche = (gleis) => {
       a.teile.push({ art: 'halt', dauer: 0.25, beimStart: () => { this.welt.setzeFahrstrasse(gleis); this.lokGleis = gleis; } });

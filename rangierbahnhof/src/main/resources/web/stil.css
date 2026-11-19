@@ -322,6 +322,8 @@ select {
 .gleis .strecke {
   position: relative;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -366,6 +368,16 @@ select {
   border: 2px solid var(--tinte);
   border-radius: 3px;
 }
+.gleismenge {
+  position: relative;
+  flex: none;
+  padding: 2px 5px;
+  background: var(--pult);
+  border: 1px solid var(--tinte);
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
 .marke {
   position: relative;
   flex: none;
@@ -442,6 +454,7 @@ select {
 
 @media (max-width: 580px) {
   #pult { max-height: 38dvh; overflow-y: auto; }
+  .gleis .strecke { justify-content: flex-end; }
   #lokpult { gap: 6px 10px; }
   #uranmarkt > div { position: static; }
 }

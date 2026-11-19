@@ -347,6 +347,60 @@ export class Waggon extends Fahrzeug {
   }
 }
 
+/** Für lange Züge nutzen alle Waggons dieselben zwei Zeichenvorgänge. */
+export class WaggonFlotte {
+  constructor(plan) {
+    this.gruppe = new THREE.Group();
+    const material = stoff(0xffffff);
+    const unterbau = new THREE.BoxGeometry(8.4, 0.75, 2.32).translate(0, Y0 + 0.54, 0);
+    const aufbau = new THREE.BoxGeometry(7.5, 2.55, 2.65).translate(0, DECK + 1.03, 0);
+    this.rahmen = new THREE.InstancedMesh(unterbau, matDunkel(), plan.kapazitaet);
+    this.aufbauten = new THREE.InstancedMesh(aufbau, material, plan.kapazitaet);
+    for (const teil of [this.rahmen, this.aufbauten]) {
+      teil.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      teil.boundingSphere = new THREE.Sphere(new THREE.Vector3(), plan.laenge / 2 + 15);
+      teil.receiveShadow = true;
+      this.gruppe.add(teil);
+    }
+  }
+
+  entsorge() {
+    for (const teil of [this.rahmen, this.aufbauten]) {
+      teil.geometry.dispose();
+      teil.dispose();
+    }
+    this.aufbauten.material.dispose();
+  }
+}
+
+export class WaggonUebersicht extends Fahrzeug {
+  constructor(nummer, flotte, index) {
+    super(new THREE.Object3D(), { achsstand: 5, raeder: [], radius: 0.46 });
+    this.nummer = nummer;
+    this.flotte = flotte;
+    this.index = index;
+    this.farbe = new THREE.Color(farbeVon(nummer));
+    this.setzeAuswahl(false);
+  }
+
+  setze(plan, gleis, u) {
+    super.setze(plan, gleis, u);
+    this.gruppe.updateMatrix();
+    for (const teil of [this.flotte.rahmen, this.flotte.aufbauten]) {
+      teil.setMatrixAt(this.index, this.gruppe.matrix);
+      teil.instanceMatrix.addUpdateRange(this.index * 16, 16);
+      teil.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  setzeAuswahl(gewaehlt) {
+    const { aufbauten } = this.flotte;
+    aufbauten.setColorAt(this.index, gewaehlt ? new THREE.Color(0xe5b524) : this.farbe);
+    aufbauten.instanceColor.addUpdateRange(this.index * 3, 3);
+    aufbauten.instanceColor.needsUpdate = true;
+  }
+}
+
 // ------------------------------------------------------------------- Lok
 
 /** Dampfrangierlok mit Rauchkammer, Schornstein und gekuppelten Treibrädern. */

@@ -9,6 +9,7 @@
 // Koordinaten: x entlang der Gleise (Prellböcke links), z quer dazu
 // (A hinten, C vorne), y nach oben. Einheit: Meter.
 
+export const DETAILGRENZE = 10;
 export const GLEISE = ['A', 'B', 'C'];
 
 export const MASSE = {
@@ -27,6 +28,7 @@ const glatt = (t) => t * t * (3 - 2 * t);
 export class Gleisplan {
   constructor(kapazitaet) {
     this.kapazitaet = kapazitaet;
+    this.gross = kapazitaet > DETAILGRENZE;
     const stumpf = kapazitaet * MASSE.TAKT + 4;
     const gesamt = stumpf + MASSE.WEICHE + MASSE.AUSZIEH;
     this.xPrellbock = -gesamt / 2;
@@ -35,7 +37,7 @@ export class Gleisplan {
     this.xEnde = this.xWeiche + MASSE.AUSZIEH;
     this.laenge = gesamt;
 
-    // Bogenlängen-Tabellen für den Teil zwischen Weiche und Prellbock.
+    // Bogenlängen-Tabellen für die gebogenen Weichenabschnitte.
     this.tabellen = {};
     this.uPrellbock = {};
     const schritt = 0.1;
@@ -45,8 +47,8 @@ export class Gleisplan {
       let x = this.xWeiche;
       let u = MASSE.AUSZIEH;
       let zAlt = 0;
-      while (x > this.xPrellbock + 1e-9) {
-        const xNeu = Math.max(this.xPrellbock, x - schritt);
+      while (x > this.xKurve + 1e-9) {
+        const xNeu = Math.max(this.xKurve, x - schritt);
         const zNeu = this.zVon(g, xNeu);
         u += Math.hypot(x - xNeu, zNeu - zAlt);
         xs.push(xNeu);
@@ -55,7 +57,7 @@ export class Gleisplan {
         zAlt = zNeu;
       }
       this.tabellen[g] = { xs, us };
-      this.uPrellbock[g] = u;
+      this.uPrellbock[g] = u + stumpf;
     }
   }
 
@@ -72,7 +74,7 @@ export class Gleisplan {
     if (u <= MASSE.AUSZIEH) return { x: this.xEnde - u, z: 0 };
     const { xs, us } = this.tabellen[g];
     const uMax = us[us.length - 1];
-    if (u >= uMax) return { x: this.xPrellbock - (u - uMax), z: this.zVon(g, this.xPrellbock) };
+    if (u >= uMax) return { x: this.xKurve - (u - uMax), z: this.zVon(g, this.xKurve) };
     let lo = 0;
     let hi = us.length - 1;
     while (hi - lo > 1) {

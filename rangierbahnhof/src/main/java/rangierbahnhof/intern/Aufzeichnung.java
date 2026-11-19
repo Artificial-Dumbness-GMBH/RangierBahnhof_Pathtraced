@@ -19,13 +19,17 @@ import rangierbahnhof.Waggon;
 final class Aufzeichnung extends Anzeige {
 
     /** Obergrenze, damit eine Endlosschleife das Programm nicht blockiert. */
-    static final int MAX_ZUEGE = 5000;
+    private static final int MIN_ZUGLIMIT = 5000;
 
     static final char[] NAMEN = { 'A', 'B', 'C' };
+    private static final String[][] KUERZEL = {
+        { "AA", "AB", "AC" }, { "BA", "BB", "BC" }, { "CA", "CB", "CC" }
+    };
 
     private final List<Stack<Waggon>> gleise = new ArrayList<>();
     private final List<List<Waggon>> erwartet = new ArrayList<>();
     private final List<String> zuege = new ArrayList<>();
+    private int zuglimit;
     private volatile boolean abgebrochen = false;
 
     /**
@@ -39,9 +43,14 @@ final class Aufzeichnung extends Anzeige {
         gleise.add(pBahnhof.getGleisA());
         gleise.add(pBahnhof.getGleisB());
         gleise.add(pBahnhof.getGleisC());
+        int anzahl = 0;
         for (Stack<Waggon> gleis : gleise) {
-            erwartet.add(inhaltVon(gleis));
+            List<Waggon> waggons = inhaltVon(gleis);
+            erwartet.add(waggons);
+            anzahl += waggons.size();
         }
+        // Die Auswahlsortierung verschiebt in jedem Durchgang alle übrigen Waggons zweimal.
+        zuglimit = Math.max(MIN_ZUGLIMIT, anzahl * (anzahl + 1));
     }
 
     /** Sorgt dafür, dass die nächste gemeldete Verschiebung den Lauf beendet. */
@@ -95,9 +104,9 @@ final class Aufzeichnung extends Anzeige {
         }
         quelle.remove(quelle.size() - 1);
         erwartet.get(nach).add(waggon);
-        zuege.add("" + NAMEN[von] + NAMEN[nach]);
-        if (zuege.size() > MAX_ZUEGE) {
-            throw new RangierFehler("Mehr als " + MAX_ZUEGE + " Verschiebungen – vermutlich eine Endlosschleife.");
+        zuege.add(KUERZEL[von][nach]);
+        if (zuege.size() > zuglimit) {
+            throw new RangierFehler("Mehr als " + zuglimit + " Verschiebungen – vermutlich eine Endlosschleife.");
         }
     }
 

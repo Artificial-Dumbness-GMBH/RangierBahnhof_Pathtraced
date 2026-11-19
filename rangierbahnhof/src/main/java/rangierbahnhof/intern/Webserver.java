@@ -110,12 +110,18 @@ final class Webserver {
 
     /** Liest "start=7,3,9" aus der Anfrage; null bei ungültigen Angaben. */
     private static int[] leseStart(String pAbfrage) {
-        if (pAbfrage == null || !pAbfrage.matches("start=\\d{1,3}(,\\d{1,3}){0,19}")) {
+        if (pAbfrage == null || !pAbfrage.startsWith("start=") || pAbfrage.length() > 5005) {
             return null;
         }
-        String[] teile = pAbfrage.substring("start=".length()).split(",");
+        String[] teile = pAbfrage.substring("start=".length()).split(",", -1);
+        if (teile.length > 1000) {
+            return null;
+        }
         int[] start = new int[teile.length];
         for (int i = 0; i < teile.length; i++) {
+            if (!teile[i].matches("[0-9]{1,4}")) {
+                return null;
+            }
             start[i] = Integer.parseInt(teile[i]);
         }
         return start;
