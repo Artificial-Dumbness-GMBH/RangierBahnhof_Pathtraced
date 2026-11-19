@@ -69,9 +69,10 @@ aus flachen Blickwinkeln sichtbar.
 
 **Raymarching.** Der Schalter aktiviert Parallax Occlusion Mapping. Der
 Shader folgt dem Blickstrahl durch die Tiefenkarte und versetzt die
-Materialtexturen am gefundenen Schnittpunkt. So wirkt das Relief von
-Schotter, Fugen und Holz aus schrägen Blickwinkeln räumlich. Die
-Mesh-Silhouetten und Schattenumrisse ändern sich dabei nicht.
+Materialtexturen am gefundenen Schnittpunkt. Ein zweiter Strahl prüft,
+welche Vertiefungen das Licht der Scheinwerfer erreicht. Die kleinen Schatten
+zwischen den Schottersteinen sind schon in der Übersicht sichtbar. Die
+Umrisse der Objekte bleiben gleich.
 Gras, Schotter, Ziegel, Holz und Stahl nutzen PBR-Texturen mit
 Farb-, Normal-, Rauheits- und Metallwerten.
 

@@ -4,7 +4,7 @@ const {chromium}=require('playwright');
 let browser;
 try {
 browser=await chromium.launch({...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {}),args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-const page=await browser.newPage({viewport:{width:800,height:600}});
+const page=await browser.newPage({viewport:{width:1100,height:800}});
 const errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('404'))errors.push(m.text());});
@@ -79,6 +79,35 @@ await page.click('#raymarching');
 assert.equal(await page.locator('#raymarching').getAttribute('aria-pressed'), 'true');
 assert.equal(await page.locator('#pathtracing').getAttribute('aria-pressed'), 'false');
 await page.evaluate(() => rangierbahnhof.welt.zeichne());
+const uebersicht = await page.evaluate(async () => {
+  const THREE = await import('/js/lib/three.module.js');
+  const { welt } = rangierbahnhof;
+  const { zeichner, kamera } = welt;
+  const breite = 640, hoehe = Math.round(breite / kamera.aspect);
+  const ziel = new THREE.WebGLRenderTarget(breite, hoehe);
+  const aus = new Uint8Array(breite * hoehe * 4);
+  const an = new Uint8Array(aus.length);
+  function liesBild(aktiv, pixel) {
+    welt.raymarchingAktiv = aktiv;
+    welt.zeichne();
+    zeichner.readRenderTargetPixels(ziel, 0, 0, breite, hoehe, pixel);
+  }
+  try {
+    zeichner.setRenderTarget(ziel);
+    liesBild(false, aus);
+    liesBild(true, an);
+    let veraendert = 0;
+    for (let i = 0; i < aus.length; i += 4) {
+      if (Math.abs(aus[i] - an[i]) > 12) veraendert++;
+    }
+    return veraendert;
+  } finally {
+    zeichner.setRenderTarget(null);
+    ziel.dispose();
+  }
+});
+console.log('Railway overview pixels visibly changed:', uebersicht);
+assert.ok(uebersicht > 700, 'raymarching is visible on the railway at overview distance');
 const reliefPixelDifferenz = await page.evaluate(async () => {
   const THREE = await import('/js/lib/three.module.js');
   const { pbrMaterial, reliefAktiv } = await import('/js/pbr.js');

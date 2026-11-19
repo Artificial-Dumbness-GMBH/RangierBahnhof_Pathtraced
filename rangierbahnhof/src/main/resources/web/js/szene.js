@@ -210,7 +210,6 @@ export class Welt {
   }
 
   baueBettung(g, plan) {
-    const schotter = gesprenkelt('#8f887d', ['#7d776d', '#a09a8e', '#6f6a62', '#b0aa9e'], 3600, 3, 3);
     const orte = [];
     const uv = [];
     const index = [];
@@ -224,7 +223,7 @@ export class Welt {
       const reihe = [[hinten - 0.6, 0.01], [hinten, 0.15], [vorn, 0.15], [vorn + 0.6, 0.01]];
       for (const [z, y] of reihe) {
         orte.push(x, y, z);
-        uv.push(x / 5, z / 5);
+        uv.push(x / 3, z / 3);
       }
       if (i > 0) {
         const a = (i - 1) * 4;
@@ -239,7 +238,7 @@ export class Welt {
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setIndex(index);
     geo.computeVertexNormals();
-    const bettung = new THREE.Mesh(geo, pbrMaterial(0xffffff, 'schotter', schotter));
+    const bettung = new THREE.Mesh(geo, pbrMaterial(0xffffff, 'schotter'));
     bettung.userData.wirftSchatten = false;
     g.add(bettung);
   }
