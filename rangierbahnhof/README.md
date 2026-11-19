@@ -76,6 +76,16 @@ Umrisse der Objekte bleiben gleich.
 Gras, Schotter, Ziegel, Holz und Stahl nutzen PBR-Texturen mit
 Farb-, Normal-, Rauheits- und Metallwerten.
 
+**Dampflok und AZ-5.** Während der Fahrt steigt volumetrischer Rauch aus dem
+Schornstein. AZ-5 löst an der Lok eine weithin sichtbare Pilzwolke aus.
+Die Kamera fährt zurück, bis Stiel und Kappe ins Bild passen. Die Wolke
+kühlt ab und löst sich über zwölf Animationssekunden auf. In allen drei
+Ansichtsmodi tastet der Renderer die Rauchdichte bis zur nächsten Oberfläche ab.
+
+Bei jedem gekauften Ersatzstab beträgt die Chance auf eine Kernschmelze 0,1 %.
+Das gilt auch für Autobuy. Eine Kernschmelze stoppt die Fahrt und zerstört die
+Lok. Mit **Von vorn** setzt du eine Ersatzlok aufs Gleis.
+
 ## Wenn etwas nicht klappt
 
 - *„Java-Programm läuft nicht“* (rote Lampe oben links): die Klasse `Main`
@@ -98,8 +108,11 @@ Mond- und Laternenlicht, emissive Materialien und bis zu fünf Pfadsegmente
 mit diffusen und näherungsweise rauen metallischen Reflexionen. Er übernimmt
 instanzierte Geometrie, Materialfarben, Instanzfarben und Farbtexturen aus der
 bestehenden Szene. Bewegte Geometrie aktualisiert die BVH, ohne sie neu aufzubauen.
-Die interne Auflösung ist auf 960 × 540 Pixel begrenzt. Es gibt keinen Denoiser;
-mehr Samples reduzieren das Rauschen. Die Geschwindigkeit hängt stark von der GPU ab.
+Der Pathtracer berechnet das Bild mit 75 % der Ausgabebreite und -höhe,
+begrenzt auf 960 × 540 Pixel. Ein räumlicher Denoiser gewichtet benachbarte
+Samples nach Sichttiefe und Helligkeit. Mit steigender Samplezahl nimmt die
+Filterstärke ab. Beim Hochskalieren hält die Sichttiefe Vordergrund und
+Hintergrund an Objektkanten getrennt.
 Schilder, Waggonnummern als Sprites und Gleismarkierungen bleiben lesbare Overlays;
 sie sind nicht Teil der Lichtsimulation. Der Pathtracer verwendet bei PBR-Materialien
 auch die Texturen für Normalen, Rauheit und Metallanteil. Transparenz und Glasbrechung werden nicht simuliert.

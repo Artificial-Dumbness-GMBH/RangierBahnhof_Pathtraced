@@ -1,5 +1,5 @@
 {
   "private": true,
-  "scripts": { "test": "node pathtracing.cjs" },
+  "scripts": { "test": "node --test stabwechsel.mjs && node pathtracing.cjs" },
   "devDependencies": { "playwright": "1.62.1" }
 }
