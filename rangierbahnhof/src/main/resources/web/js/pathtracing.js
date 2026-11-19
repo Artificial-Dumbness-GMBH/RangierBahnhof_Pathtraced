@@ -111,15 +111,19 @@ vec3 lampenLicht(vec3 p, vec3 n, vec3 v, vec3 albedo, float metall, float rau) {
 }
 void main() {
   rng = uint(gl_FragCoord.x)*1973u + uint(gl_FragCoord.y)*9277u + uint(saat)*26699u + 1u;
-  vec2 uv = bildUv + (vec2(zufall(),zufall())-0.5)/aufloesung;
+  vec2 jitter = (vec2(zufall(),zufall())-0.5)/aufloesung;
+  // Nach einem Reset ermittelt der erste Strahl die Tiefe in der Pixelmitte.
+  bool erstesBild = samples == 0.0;
+  vec2 uv = erstesBild ? bildUv : bildUv + jitter;
+  vec4 alt = erstesBild ? vec4(0.0) : texelFetch(vorher,ivec2(gl_FragCoord.xy),0);
   vec4 v = inverseProjektion*vec4(uv*2.0-1.0,1.0,1.0);
   vec3 d = normalize(mat3(kameraWelt)*v.xyz), o = kameraWelt[3].xyz;
-  float sichttiefe = 0.0;
+  float sichttiefe = alt.a;
   vec3 licht=vec3(0), gewicht=vec3(1);
   for (int bounce=0; bounce<5; bounce++) {
     float l; vec2 bary; int hit=treffer(o,d,l,bary,false,1e20);
     if(hit<0) { licht+=gewicht*himmel(d); break; }
-    if (bounce==0) sichttiefe = -dot(d,kameraWelt[2].xyz)*l;
+    if (bounce==0 && erstesBild) sichttiefe = -dot(d,kameraWelt[2].xyz)*l;
     int t=hit*11;
     vec3 n=normalize(daten(dreiecke,t+3).xyz*(1.0-bary.x-bary.y)+daten(dreiecke,t+4).xyz*bary.x+daten(dreiecke,t+5).xyz*bary.y);
     if(dot(n,d)>0.0) n=-n;
@@ -181,8 +185,8 @@ void main() {
       gewicht/=chance;
     }
   }
-  vec3 alt = samples>0.0 ? texture(vorher,bildUv).rgb : vec3(0);
-  ausgabe=vec4(alt+(licht-alt)/(samples+1.0),sichttiefe);
+  // Die Farbsamples dürfen weiter jittern. Denoiser und Rauch nutzen die feste Tiefe.
+  ausgabe=vec4(alt.rgb+(licht-alt.rgb)/(samples+1.0),sichttiefe);
 }`;
 
 function datenTextur(werte, breite) {

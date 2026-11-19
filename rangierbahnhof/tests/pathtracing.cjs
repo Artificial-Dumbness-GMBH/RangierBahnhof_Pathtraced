@@ -56,6 +56,27 @@ assert.equal(pixels.finite,true,'finite GPU output');
 assert.equal(pixels.lit,true,'non-black GPU output');
 assert.equal(pixels.denoised,true,'denoiser changes radiance');
 assert.equal(pixels.depthPreserved,true,'denoiser preserves surface depth for upscaling');
+const ausgabeTest = await page.evaluate(() => {
+  const { welt } = rangierbahnhof;
+  const { pathtracing, zeichner } = welt;
+  const vorher = new Float32Array(160 * 90 * 4);
+  const danach = new Float32Array(vorher.length);
+  zeichner.readRenderTargetPixels(pathtracing.ziele[0], 0, 0, 160, 90, vorher);
+  welt.zeichne();
+  zeichner.readRenderTargetPixels(pathtracing.ziele[0], 0, 0, 160, 90, danach);
+  const gl = zeichner.getContext();
+  const b = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+  const ausgabe = new Uint8Array(b * h * 4);
+  gl.readPixels(0, 0, b, h, gl.RGBA, gl.UNSIGNED_BYTE, ausgabe);
+  return {
+    geaenderteTiefen: danach.filter((wert, i) => i % 4 === 3 && wert !== vorher[i]).length,
+    akkumuliert: danach.some((wert, i) => i % 4 !== 3 && Math.abs(wert - vorher[i]) > 0.001),
+    sichtbar: ausgabe.some((wert, i) => i % 4 !== 3 && wert > 32),
+  };
+});
+assert.equal(ausgabeTest.geaenderteTiefen, 0, 'unchanged camera preserves the denoiser depth guide');
+assert.equal(ausgabeTest.akkumuliert, true, 'radiance still accumulates jittered samples');
+assert.equal(ausgabeTest.sichtbar, true, 'the upscaled denoiser output reaches the canvas');
 const lampenTest = await page.evaluate(() => {
   const { welt } = rangierbahnhof;
   const { zeichner, pathtracing, lichtquellen } = welt;
