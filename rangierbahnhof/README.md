@@ -82,7 +82,7 @@ Die Kamera fährt zurück, bis Stiel und Kappe ins Bild passen. Die Wolke
 kühlt ab und löst sich über zwölf Animationssekunden auf. In allen drei
 Ansichtsmodi tastet der Renderer die Rauchdichte bis zur nächsten Oberfläche ab.
 
-Bei jedem gekauften Ersatzstab beträgt die Chance auf eine Kernschmelze 0,1 %.
+Bei jedem gekauften Ersatzstab beträgt die Chance auf eine Kernschmelze 0,00000001 % (1 zu 10 Milliarden).
 Das gilt auch für Autobuy. Eine Kernschmelze stoppt die Fahrt und zerstört die
 Lok. Mit **Von vorn** setzt du eine Ersatzlok aufs Gleis.
 

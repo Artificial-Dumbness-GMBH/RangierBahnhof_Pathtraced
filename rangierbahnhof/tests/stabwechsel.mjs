@@ -20,8 +20,8 @@ function aufbauen(t, zufall) {
   return { dampf, ergebnis: () => ({ explosionen, abbrueche, gespeichert }) };
 }
 
-test('Genau 0,001 wechselt den Stab regulär, weitere Klicks würfeln nicht', t => {
-  const { dampf, ergebnis } = aufbauen(t, 0.001);
+test('Genau 0,0000000001 wechselt den Stab regulär, weitere Klicks würfeln nicht', t => {
+  const { dampf, ergebnis } = aufbauen(t, 1e-10);
   assert.equal(dampf.kaufe(), true);
   assert.equal(dampf.fahrbereit, true);
   assert.equal(dampf.kaufe(), false);
@@ -30,8 +30,8 @@ test('Genau 0,001 wechselt den Stab regulär, weitere Klicks würfeln nicht', t 
   assert.equal(ergebnis().explosionen, 0);
 });
 
-test('Ein Wert unter 0,001 löst eine Kernschmelze und genau einen Abbruch aus', t => {
-  const { dampf, ergebnis } = aufbauen(t, 0.000999);
+test('Ein Wert unter 0,0000000001 löst eine Kernschmelze und genau einen Abbruch aus', t => {
+  const { dampf, ergebnis } = aufbauen(t, 9.99e-11);
   assert.equal(dampf.kaufe(), true);
   assert.equal(dampf.fahrbereit, false);
   assert.equal(dampf.ursache, 'Kernschmelze beim Stabwechsel');
@@ -58,8 +58,8 @@ test('Autobuy stoppt die laufende Fahrt am Stabwechsel', t => {
 });
 
 test('Der Boost prüft jeden Nachkauf und hält exakt beim fehlgeschlagenen Wechsel an', t => {
-  const { dampf, ergebnis } = aufbauen(t, 0.001);
-  Math.random.mock.mockImplementationOnce(() => 0.000999, 1);
+  const { dampf, ergebnis } = aufbauen(t, 1e-10);
+  Math.random.mock.mockImplementationOnce(() => 9.99e-11, 1);
   dampf.brennstoff = 1;
   dampf.setzeAutobuy(true);
   const fahrt = { beschaeftigt: true, schritt: dt => dt };

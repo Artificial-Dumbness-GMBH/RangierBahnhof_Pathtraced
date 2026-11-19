@@ -1,4 +1,5 @@
 const BRENNZEIT = 90; // Simulationssekunden pro Brennstab
+const KERNSCHMELZEN_CHANCE = 1 / 10_000_000_000;
 const AUFSCHLAG_CENT = 3500;
 const ERSATZKURS = { usdProPfund: 91.55, datum: '2026-10-30', aktuell: false };
 const GELD = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' });
@@ -79,7 +80,7 @@ export class Dampfbetrieb {
     this.ausgaben += this.preis;
     this.faesser++;
     this.brennstoff = BRENNZEIT;
-    if (Math.random() < 0.001) this.sprenge('Kernschmelze beim Stabwechsel');
+    if (Math.random() < KERNSCHMELZEN_CHANCE) this.sprenge('Kernschmelze beim Stabwechsel');
   }
 
   zeigeKauf() {
