@@ -4,6 +4,8 @@
 
 import * as THREE from './lib/three.module.js';
 import { GLEISE, MASSE } from './gleisplan.js';
+import { Volumenlicht } from './volumenlicht.js';
+import { Pathtracing } from './pathtracing.js';
 
 const Y0 = MASSE.SCHIENE_OBEN;
 const D = MASSE.GLEISABSTAND;
@@ -100,6 +102,12 @@ export class Welt {
     this.zeichner.toneMapping = THREE.ACESFilmicToneMapping;
     this.zeichner.toneMappingExposure = 1.0;
     this.zeichner.outputColorSpace = THREE.SRGBColorSpace;
+    this.volumenlicht = this.zeichner.extensions.has('EXT_color_buffer_float')
+      ? new Volumenlicht(this.zeichner)
+      : null;
+    this.volumenlichtAktiv = Boolean(this.volumenlicht);
+    this.pathtracing = this.volumenlicht ? new Pathtracing(this.zeichner) : null;
+    this.pathtracingAktiv = false;
 
     this.szene = new THREE.Scene();
     this.szene.background = textur(4, 256, (c, b, h) => {
@@ -573,11 +581,19 @@ export class Welt {
     const b = Math.max(1, Math.floor(feld.width));
     const h = Math.max(1, Math.floor(feld.height));
     this.zeichner.setSize(b, h, false);
+    this.volumenlicht?.passeGroesseAn();
+    this.pathtracing?.passeGroesseAn();
     this.kamera.aspect = b / h;
     this.kamera.updateProjectionMatrix();
   }
 
   zeichne() {
-    this.zeichner.render(this.szene, this.kamera);
+    if (this.pathtracingAktiv && this.pathtracing) {
+      this.pathtracing.zeichne(this.szene, this.kamera, this.sonne, this.volumenlichtAktiv);
+    } else if (this.volumenlichtAktiv) {
+      this.volumenlicht.zeichne(this.szene, this.kamera, this.sonne);
+    } else {
+      this.zeichner.render(this.szene, this.kamera);
+    }
   }
 }
