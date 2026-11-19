@@ -41,6 +41,7 @@ const zustand = {
   schwebend: null,
   geschafft: false,
   laeuft: true,
+  vorspulen: false,
   haltNachZug: false,
   lauf: null,
   tempo: 2,
@@ -123,6 +124,7 @@ function stelleStartHer() {
   sortierAnfrage++;
   zustand.lauf = null;
   zustand.laeuft = true;
+  zustand.vorspulen = false;
   zustand.haltNachZug = false;
   zustand.geschafft = false;
   zustand.zaehler = 0;
@@ -130,6 +132,7 @@ function stelleStartHer() {
   waehle(null);
   for (const w of zustand.waggons) w.gleis = 'A';
   zustand.betrieb.stelleAuf(zustand.waggons);
+  dampfbetrieb.kaufeAutomatisch();
   $('befehl').textContent = ' ';
   zeigeGrundmeldung();
   zeichneGleisbild();
@@ -403,6 +406,8 @@ function stelleTastenEin() {
   $('pause').textContent = zustand.laeuft ? 'Pause' : 'Weiter';
   $('einSchritt').disabled = !offen;
   $('zumEnde').disabled = !offen;
+  $('zumEnde').textContent = zustand.vorspulen ? 'Vorspulen stoppen' : 'Zum Ende';
+  $('zumEndeHand').textContent = zustand.vorspulen ? 'Vorspulen stoppen' : 'Fahrten überspringen';
   $('zumEndeHand').disabled = !zustand.betrieb?.beschaeftigt || !dampfbetrieb.fahrbereit;
 }
 
@@ -517,8 +522,7 @@ $('vonVorn').addEventListener('click', () => {
   dampfbetrieb.repariere();
   stelleStartHer();
 });
-$('brennstabKaufen').addEventListener('click', () => {
-  if (!dampfbetrieb.kaufe()) return;
+function zeigeNachkauf() {
   zeichneGleisbild();
   stelleTastenEin();
   if (zustand.betrieb.beschaeftigt && zustand.laeuft) {
@@ -528,12 +532,20 @@ $('brennstabKaufen').addEventListener('click', () => {
   } else {
     zeigeGrundmeldung();
   }
+}
+
+$('brennstabKaufen').addEventListener('click', () => {
+  if (dampfbetrieb.kaufe()) zeigeNachkauf();
+});
+$('autobuy').addEventListener('click', () => {
+  if (dampfbetrieb.setzeAutobuy(!dampfbetrieb.autobuy)) zeigeNachkauf();
 });
 $('az5').addEventListener('click', () => {
   dampfbetrieb.sprenge();
   sortierAnfrage++;
   zustand.lauf = null;
   zustand.laeuft = false;
+  zustand.vorspulen = false;
   zustand.schwebend = null;
   waehle(null);
   zeichneZaehler();
@@ -542,6 +554,7 @@ $('az5').addEventListener('click', () => {
 });
 $('ausfuehren').addEventListener('click', () => fuehreAlgorithmusAus());
 $('pause').addEventListener('click', () => {
+  zustand.vorspulen = false;
   zustand.laeuft = !zustand.laeuft;
   zustand.haltNachZug = false;
   if (zustand.laeuft && laufOffen() && !zustand.betrieb.beschaeftigt) spieleNaechsten(zustand.lauf);
@@ -549,6 +562,7 @@ $('pause').addEventListener('click', () => {
 });
 $('einSchritt').addEventListener('click', () => {
   if (!laufOffen()) return;
+  zustand.vorspulen = false;
   zustand.haltNachZug = true;
   zustand.laeuft = true;
   if (!zustand.betrieb.beschaeftigt) spieleNaechsten(zustand.lauf);
@@ -559,13 +573,9 @@ $('zumEnde').addEventListener('click', () => {
   zustand.haltNachZug = false;
   zustand.laeuft = true;
   if (!zustand.betrieb.beschaeftigt) spieleNaechsten(zustand.lauf);
-  ueberspringeFahrten();
-  stelleTastenEin();
+  wechsleVorspulen();
 });
-$('zumEndeHand').addEventListener('click', () => {
-  ueberspringeFahrten();
-  stelleTastenEin();
-});
+$('zumEndeHand').addEventListener('click', wechsleVorspulen);
 $('tempo').addEventListener('input', () => {
   setzeTempo(Number($('tempo').value));
   merke('tempo', $('tempo').value);
@@ -662,9 +672,22 @@ function fahre(sekunden) {
   return genutzt;
 }
 
-function ueberspringeFahrten() {
-  while (zustand.betrieb.beschaeftigt && fahre(dampfbetrieb.brennstoff) > 0) {
-    // Beim Sprung zählt dieselbe Brennzeit wie bei einer sichtbaren Fahrt.
+function wechsleVorspulen() {
+  zustand.vorspulen = !zustand.vorspulen;
+  if (zustand.vorspulen) spuleVor();
+  stelleTastenEin();
+}
+
+function spuleVor() {
+  // Mit Autobuy kann ein Lauf sehr lang werden. Zwischen den Abschnitten
+  // bleiben Anzeige, Pause und AZ-5 weiterhin bedienbar.
+  const bis = performance.now() + 8;
+  while (zustand.betrieb.beschaeftigt && performance.now() < bis) {
+    if (fahre(dampfbetrieb.brennstoff) <= 0) break;
+  }
+  if (!zustand.betrieb.beschaeftigt || !dampfbetrieb.fahrbereit) {
+    zustand.vorspulen = false;
+    stelleTastenEin();
   }
 }
 
@@ -672,7 +695,11 @@ let letzteZeit = performance.now();
 function bild(jetzt) {
   const dt = Math.min(0.1, (jetzt - letzteZeit) / 1000);
   letzteZeit = jetzt;
-  const fahrzeit = zustand.laeuft ? fahre(dt * zustand.tempo) : 0;
+  let fahrzeit = 0;
+  if (zustand.laeuft) {
+    if (zustand.vorspulen) spuleVor();
+    else fahrzeit = fahre(dt * zustand.tempo);
+  }
   dampfbetrieb.effekte.schritt(dt, fahrzeit);
   kamera.schritt(dt);
   welt.markiere(zustand.schwebend, zustand.gewaehlt);

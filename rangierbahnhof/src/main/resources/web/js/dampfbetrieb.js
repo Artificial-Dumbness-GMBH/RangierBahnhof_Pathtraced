@@ -15,6 +15,7 @@ export class Dampfbetrieb {
     this.effekte = new Dampfeffekte(welt.szene, welt.haloTextur, lok);
     this.speichere = () => speichere(JSON.stringify({
       brennstoff: this.brennstoff, faesser: this.faesser, ausgaben: this.ausgaben,
+      autobuy: this.autobuy,
     }));
 
     let stand;
@@ -23,6 +24,8 @@ export class Dampfbetrieb {
       ? Math.min(BRENNZEIT, Math.max(0, stand.brennstoff)) : BRENNZEIT;
     this.faesser = Number.isSafeInteger(stand?.faesser) && stand.faesser >= 0 ? stand.faesser : 0;
     this.ausgaben = Number.isSafeInteger(stand?.ausgaben) && stand.ausgaben >= 0 ? stand.ausgaben : 0;
+    this.autobuy = stand?.autobuy === true;
+    feld('autobuy').setAttribute('aria-pressed', String(this.autobuy));
     this.kurs = ERSATZKURS;
     feld('brennstab').max = BRENNZEIT;
     this.zeige();
@@ -36,12 +39,32 @@ export class Dampfbetrieb {
 
   fahre(betrieb, sekunden) {
     if (!this.fahrbereit || !betrieb.beschaeftigt) return 0;
-    const dauer = Math.min(sekunden, this.brennstoff);
-    const genutzt = betrieb.schritt(dauer);
-    this.brennstoff = Math.max(0, this.brennstoff - genutzt);
-    if (this.brennstoff < 0.000001) this.brennstoff = 0;
+    let rest = sekunden;
+    while (rest > 0 && this.fahrbereit && betrieb.beschaeftigt) {
+      const dauer = Math.min(rest, this.brennstoff);
+      const genutzt = betrieb.schritt(dauer);
+      rest -= genutzt;
+      this.brennstoff = Math.max(0, this.brennstoff - genutzt);
+      if (this.brennstoff < 0.000001) {
+        this.brennstoff = 0;
+        this.kaufeAutomatisch();
+      }
+      if (genutzt < dauer) break;
+    }
     this.zeige();
-    return genutzt;
+    return sekunden - rest;
+  }
+
+  setzeAutobuy(aktiv) {
+    this.autobuy = aktiv;
+    feld('autobuy').setAttribute('aria-pressed', String(aktiv));
+    if (this.kaufeAutomatisch()) return true;
+    this.speichere();
+    return false;
+  }
+
+  kaufeAutomatisch() {
+    return this.autobuy && this.kaufe();
   }
 
   kaufe() {
