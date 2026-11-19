@@ -111,22 +111,22 @@ export class Welt {
     this.szene = new THREE.Scene();
     this.szene.background = textur(4, 256, (c, b, h) => {
       const verlauf = c.createLinearGradient(0, 0, 0, h);
-      verlauf.addColorStop(0, '#5f9bcf');
-      verlauf.addColorStop(0.55, '#a6cde6');
-      verlauf.addColorStop(1, '#dce9ee');
+      verlauf.addColorStop(0, '#080e22');
+      verlauf.addColorStop(0.55, '#16213a');
+      verlauf.addColorStop(1, '#344461');
       c.fillStyle = verlauf;
       c.fillRect(0, 0, b, h);
     });
 
     this.kamera = new THREE.PerspectiveCamera(36, 1, 1, 1800);
 
-    this.szene.add(new THREE.HemisphereLight(0xd4e6f6, 0x8c9070, 1.15));
-    this.sonne = new THREE.DirectionalLight(0xfff0d8, 2.9);
-    this.sonne.castShadow = true;
-    this.sonne.shadow.mapSize.set(2048, 2048);
-    this.sonne.shadow.bias = -0.0005;
-    this.sonne.shadow.normalBias = 0.05;
-    this.szene.add(this.sonne, this.sonne.target);
+    this.szene.add(new THREE.HemisphereLight(0x91b8ff, 0x666d85, 0.37));
+    this.mond = new THREE.DirectionalLight(0xa8c8ff, 0.28);
+    this.mond.castShadow = true;
+    this.mond.shadow.mapSize.set(2048, 2048);
+    this.mond.shadow.bias = -0.0005;
+    this.mond.shadow.normalBias = 0.05;
+    this.szene.add(this.mond, this.mond.target);
 
     const gras = gesprenkelt('#6d8c55', ['#63824c', '#76955d', '#5b7a47', '#7f9c66'], 2600, 5, 7);
     gras.repeat.set(170, 170);
@@ -134,6 +134,15 @@ export class Welt {
     boden.rotation.x = -Math.PI / 2;
     boden.receiveShadow = true;
     this.szene.add(boden);
+
+    this.haloTextur = textur(64, 64, (ctx) => {
+      const verlauf = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      verlauf.addColorStop(0, 'rgba(255,255,255,0.72)');
+      verlauf.addColorStop(0.25, 'rgba(255,255,255,0.24)');
+      verlauf.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = verlauf;
+      ctx.fillRect(0, 0, 64, 64);
+    });
 
     this.fahrzeuge = new THREE.Group();
     this.szene.add(this.fahrzeuge);
@@ -151,10 +160,13 @@ export class Welt {
       this.szene.remove(this.anlage);
       this.anlage.traverse((o) => {
         if (o.geometry) o.geometry.dispose();
+        if (o.isSpotLight) o.shadow.dispose();
+        if (o.userData.lichtHalo) o.material.dispose();
       });
     }
     this.plan = plan;
     this.schilder = [];
+    this.lichtquellen = [];
     const g = new THREE.Group();
     this.anlage = g;
 
@@ -175,6 +187,7 @@ export class Welt {
     for (const anteil of [0.14, 0.47, 0.8]) {
       this.baueLichtmast(g, plan.xPrellbock + plan.laenge * anteil, -(D + 4.5));
     }
+    this.baueLichtmast(g, plan.xPrellbock + plan.laenge * 0.36, D + 10, -1);
     this.baueBaeume(g, plan);
 
     g.traverse((o) => {
@@ -185,11 +198,11 @@ export class Welt {
     });
     this.szene.add(g);
 
-    // Die Sonne steht links vorne oben; ihr Schattenbereich deckt die Anlage ab.
+    // Schwaches Mondlicht hält Umrisse außerhalb der Lichtkegel sichtbar.
     const halb = plan.laenge / 2 + 32;
-    this.sonne.position.set(-70, 115, 80);
-    this.sonne.target.position.set(0, 0, -8);
-    const s = this.sonne.shadow.camera;
+    this.mond.position.set(-70, 115, 80);
+    this.mond.target.position.set(0, 0, -8);
+    const s = this.mond.shadow.camera;
     s.left = -halb; s.right = halb; s.top = 62; s.bottom = -62;
     s.near = 20; s.far = 380;
     s.updateProjectionMatrix();
@@ -343,15 +356,33 @@ export class Welt {
     return gruppe;
   }
 
+  baueHalo(g, farbe, x, y, z, groesse) {
+    const material = new THREE.SpriteMaterial({
+      map: this.haloTextur, color: farbe, blending: THREE.AdditiveBlending,
+      depthWrite: false, transparent: true, toneMapped: false,
+    });
+    const halo = new THREE.Sprite(material);
+    halo.position.set(x, y, z);
+    halo.scale.set(groesse, groesse, 1);
+    halo.userData.lichtHalo = true;
+    g.add(halo);
+    return halo;
+  }
+
   baueLaterne(g, gleis, x, z) {
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 2.2, 8), matt(0x2f3133));
     mast.position.set(x, 1.1, z);
-    const glas = new THREE.MeshStandardMaterial({ color: 0xd5362b, emissive: 0xd5362b, emissiveIntensity: 1.4 });
+    const glas = new THREE.MeshStandardMaterial({ color: 0xd5362b, emissive: 0xd5362b, emissiveIntensity: 4 });
     const lampe = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), glas);
     lampe.position.set(x, 2.5, z);
     lampe.userData.wirftSchatten = false;
     g.add(mast, lampe);
-    this.laternen[gleis] = glas;
+    const licht = new THREE.PointLight(0xd5362b, 9, 7);
+    licht.position.set(x, 2.5, z);
+    const halo = this.baueHalo(g, licht.color, x, 2.5, z, 2.3);
+    g.add(licht);
+    this.lichtquellen.push(licht);
+    this.laternen[gleis] = { glas, licht, halo };
   }
 
   /** Farbige Fläche unter einem Gleis: zeigt Mauszeiger und Auswahl an. */
@@ -464,19 +495,32 @@ export class Welt {
     g.add(schuppen);
   }
 
-  baueLichtmast(g, x, z) {
+  baueLichtmast(g, x, z, richtung = 1) {
     const grau = matt(0x70757a);
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 10, 10), grau);
     mast.position.set(x, 5, z);
     g.add(mast);
-    g.add(quader(0.12, 0.12, 3.0, grau, x, 9.9, z + 1.2));
-    const hell = new THREE.MeshStandardMaterial({ color: 0xfff6d0, emissive: 0xfff0b0, emissiveIntensity: 0.9 });
+    g.add(quader(0.12, 0.12, 3.0, grau, x, 9.9, z + 1.2 * richtung));
+    const farbe = 0xffca83;
+    const hell = new THREE.MeshStandardMaterial({ color: 0xfff6d0, emissive: farbe, emissiveIntensity: 7 });
     for (const dz of [1.2, 2.6]) {
-      g.add(quader(0.7, 0.14, 0.4, grau, x, 9.78, z + dz));
-      const schein = quader(0.6, 0.03, 0.32, hell, x, 9.7, z + dz);
+      const lampeZ = z + dz * richtung;
+      g.add(quader(0.7, 0.14, 0.4, grau, x, 9.78, lampeZ));
+      const schein = quader(0.6, 0.03, 0.32, hell, x, 9.7, lampeZ);
       schein.userData.wirftSchatten = false;
       g.add(schein);
+      this.baueHalo(g, farbe, x, 9.55, lampeZ, 3.3);
     }
+    const licht = new THREE.SpotLight(farbe, 1750, 58, Math.PI / 3.35, 0.65);
+    licht.position.set(x, 9.57, z + 1.9 * richtung);
+    licht.target.position.set(x, 0, z + 15 * richtung);
+    licht.castShadow = true;
+    licht.shadow.mapSize.set(512, 512);
+    licht.shadow.camera.near = 0.5;
+    licht.shadow.normalBias = 0.035;
+    licht.shadow.bias = -0.0005;
+    g.add(licht, licht.target);
+    this.lichtquellen.push(licht);
   }
 
   baueBaeume(g, plan) {
@@ -524,8 +568,11 @@ export class Welt {
   setzeFahrstrasse(gleis) {
     for (const name of GLEISE) {
       const farbe = name === gleis ? 0x35c46a : 0xd5362b;
-      this.laternen[name].color.setHex(farbe);
-      this.laternen[name].emissive.setHex(farbe);
+      const { glas, licht, halo } = this.laternen[name];
+      glas.color.setHex(farbe);
+      glas.emissive.setHex(farbe);
+      licht.color.setHex(farbe);
+      halo.material.color.setHex(farbe);
     }
   }
 
@@ -586,7 +633,7 @@ export class Welt {
 
   zeichne() {
     if (this.pathtracingAktiv && this.pathtracing) {
-      this.pathtracing.zeichne(this.szene, this.kamera, this.sonne);
+      this.pathtracing.zeichne(this.szene, this.kamera, this.mond, this.lichtquellen);
     } else {
       reliefAktiv.value = this.raymarchingAktiv;
       this.zeichner.render(this.szene, this.kamera);

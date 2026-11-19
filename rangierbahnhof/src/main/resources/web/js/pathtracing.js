@@ -8,7 +8,12 @@ out vec4 ausgabe;
 uniform sampler2D dreiecke, knoten, atlas, vorher;
 uniform mat4 inverseProjektion, kameraWelt;
 uniform vec2 aufloesung;
-uniform vec3 sonnenRichtung, sonnenFarbe;
+uniform vec3 mondRichtung, mondFarbe;
+const int maxLampen = 7;
+uniform int lampenAnzahl;
+uniform vec4 lampenPosition[maxLampen];
+uniform vec4 lampenFarbe[maxLampen];
+uniform vec4 lampenRichtung[maxLampen];
 uniform float samples, saat;
 uint rng;
 float zufall() {
@@ -27,9 +32,9 @@ bool boxTreffer(vec3 o, vec3 d, vec3 unten, vec3 oben, float ende) {
 }
 // BVH mit maximal acht Dreiecken pro Blatt. Auch Schattenstrahlen verwenden
 // die vollständige Geometrie, einschließlich der InstancedMeshes.
-int treffer(vec3 o, vec3 d, out float distanz, out vec2 bary, bool schatten) {
+int treffer(vec3 o, vec3 d, out float distanz, out vec2 bary, bool schatten, float reichweite) {
   int stapel[64]; int anzahl = 1; stapel[0] = 0;
-  int gefunden = -1; distanz = 1e20;
+  int gefunden = -1; distanz = reichweite;
   while (anzahl > 0) {
     int k = stapel[--anzahl];
     vec4 a = daten(knoten,k*2), b = daten(knoten,k*2+1);
@@ -58,10 +63,49 @@ vec3 halbkugel(vec3 n) {
   vec3 t = normalize(cross(abs(n.y)<0.99 ? vec3(0,1,0) : vec3(1,0,0),n));
   return normalize(t*(r*cos(phi))+cross(n,t)*(r*sin(phi))+n*sqrt(1.0-r*r));
 }
-vec3 himmel(vec3 d) { return mix(vec3(0.72,0.83,0.91),vec3(0.22,0.45,0.72),sqrt(max(d.y,0.0))); }
+vec3 himmel(vec3 d) { return mix(vec3(0.033,0.053,0.105),vec3(0.009,0.015,0.039),sqrt(max(d.y,0.0))); }
 vec3 atlasProbe(float index, float raster, vec2 uv) {
   vec2 tile = vec2(mod(index,raster),floor(index/raster));
   return texture(atlas,(tile*258.0+1.5+uv*255.0)/(raster*258.0)).rgb;
+}
+// Lokale Lampen beleuchten auch metallische Flächen direkt. Der
+// GGX-Term nutzt dieselben Rauheits- und Metallkarten wie die Reflexionsstrahlen.
+vec3 lampenLicht(vec3 p, vec3 n, vec3 v, vec3 albedo, float metall, float rau) {
+  vec3 summe = vec3(0.0);
+  float nv = max(dot(n,v), 0.001);
+  float alpha2 = pow(max(rau, 0.08), 4.0);
+  vec3 f0 = mix(vec3(0.04), albedo, metall);
+  for (int i=0; i<maxLampen; i++) {
+    if (i>=lampenAnzahl) break;
+    vec3 delta = lampenPosition[i].xyz - p;
+    float abstand = length(delta);
+    float reichweite = lampenFarbe[i].w;
+    if (abstand>=reichweite || abstand<0.01) continue;
+    vec3 l = delta / abstand;
+    float nl = dot(n,l);
+    if (nl<=0.0) continue;
+    float kegel = 1.0;
+    if (lampenRichtung[i].w>=0.0) {
+      kegel = smoothstep(lampenRichtung[i].w, lampenPosition[i].w, dot(-l,lampenRichtung[i].xyz));
+      if (kegel<=0.0) continue;
+    }
+    float distanz;
+    vec2 bary;
+    // Beim Signal endet der Schattenstrahl vor dem eigenen Glaskolben.
+    float lichtRadius = lampenRichtung[i].w<0.0 ? 0.45 : 0.015;
+    if (treffer(p,l,distanz,bary,true,abstand-lichtRadius)>=0) continue;
+    vec3 h = normalize(l+v);
+    float nh = max(dot(n,h),0.0), vh = clamp(dot(v,h),0.0,1.0);
+    float nenner = nh*nh*(alpha2-1.0)+1.0;
+    float d = alpha2 / (3.14159265*nenner*nenner);
+    float vis = 0.5 / max(nl*sqrt(nv*nv*(1.0-alpha2)+alpha2)
+      + nv*sqrt(nl*nl*(1.0-alpha2)+alpha2),0.001);
+    vec3 f = f0 + (1.0-f0)*pow(1.0-vh,5.0);
+    vec3 diffus = (1.0-f)*(1.0-metall)*albedo/3.14159265;
+    float auslauf = pow(max(1.0-pow(abstand/reichweite,4.0),0.0),2.0);
+    summe += (diffus+d*vis*f)*nl*kegel*auslauf*lampenFarbe[i].rgb/max(abstand*abstand,0.1);
+  }
+  return summe;
 }
 void main() {
   rng = uint(gl_FragCoord.x)*1973u + uint(gl_FragCoord.y)*9277u + uint(saat)*26699u + 1u;
@@ -70,7 +114,7 @@ void main() {
   vec3 d = normalize(mat3(kameraWelt)*v.xyz), o = kameraWelt[3].xyz;
   vec3 licht=vec3(0), gewicht=vec3(1);
   for (int bounce=0; bounce<5; bounce++) {
-    float l; vec2 bary; int hit=treffer(o,d,l,bary,false);
+    float l; vec2 bary; int hit=treffer(o,d,l,bary,false,1e20);
     if(hit<0) { licht+=gewicht*himmel(d); break; }
     int t=hit*11;
     vec3 n=normalize(daten(dreiecke,t+3).xyz*(1.0-bary.x-bary.y)+daten(dreiecke,t+4).xyz*bary.x+daten(dreiecke,t+5).xyz*bary.y);
@@ -110,6 +154,7 @@ void main() {
     }
     licht+=gewicht*emission.rgb;
     vec3 p=o+d*l+hitNormal*0.003;
+    licht += gewicht*lampenLicht(p,n,-d,albedo,metall,rau);
     // Die Auswahlwahrscheinlichkeit kürzt sich mit dem BRDF-Gewicht heraus.
     float fresnel=0.04+0.96*pow(1.0-max(dot(-d,n),0.0),5.0);
     float spiegel=mix(fresnel,1.0,metall);
@@ -119,9 +164,9 @@ void main() {
       gewicht*=mix(vec3(1),albedo,metall);
     } else {
       float sl; vec2 sb;
-      // Kleine Sonnenscheibe für weiche Schatten.
-      vec3 sd=normalize(sonnenRichtung+halbkugel(sonnenRichtung)*0.00465);
-      if(treffer(p,sd,sl,sb,true)<0) licht+=gewicht*albedo*sonnenFarbe*max(dot(n,sd),0.0)/3.14159265;
+      // Die kleine Mondscheibe erzeugt weiche Schatten.
+      vec3 sd=normalize(mondRichtung+halbkugel(mondRichtung)*0.00465);
+      if(treffer(p,sd,sl,sb,true,1e20)<0) licht+=gewicht*albedo*mondFarbe*max(dot(n,sd),0.0)/3.14159265;
       gewicht*=albedo;
       d=halbkugel(n);
     }
@@ -164,9 +209,15 @@ export class Pathtracing {
       vorher: { value: this.ziele[0].texture },
       inverseProjektion: { value: null }, kameraWelt: { value: null },
       aufloesung: { value: new THREE.Vector2(1, 1) },
-      sonnenRichtung: { value: new THREE.Vector3() }, sonnenFarbe: { value: new THREE.Color() },
+      mondRichtung: { value: new THREE.Vector3() }, mondFarbe: { value: new THREE.Color() },
+      lampenAnzahl: { value: 0 },
+      lampenPosition: { value: Array.from({ length: 7 }, () => new THREE.Vector4()) },
+      lampenFarbe: { value: Array.from({ length: 7 }, () => new THREE.Vector4()) },
+      lampenRichtung: { value: Array.from({ length: 7 }, () => new THREE.Vector4()) },
       samples: { value: 0 }, saat: { value: 0 },
     };
+    this.lichtOrt = new THREE.Vector3();
+    this.lichtRichtung = new THREE.Vector3();
     this.kamera = new THREE.Camera();
     this.szene = new THREE.Scene();
     this.material = new THREE.ShaderMaterial({
@@ -347,17 +398,36 @@ export class Pathtracing {
     return true;
   }
 
-  zeichne(szene,kamera,sonne) {
+  zeichne(szene, kamera, mond, lampen) {
     const geaendert=this.aktualisiere(szene);
     kamera.updateMatrixWorld();
     const ansicht=[...kamera.matrixWorld.elements,...kamera.projectionMatrix.elements,
-      ...sonne.position.toArray(),...sonne.target.position.toArray(),sonne.color.getHex(),sonne.intensity].join(',');
+      ...mond.position.toArray(),...mond.target.position.toArray(),mond.color.getHex(),mond.intensity,
+      ...lampen.flatMap(lampe => [...lampe.matrixWorld.elements, lampe.color.getHex(), lampe.intensity,
+        lampe.distance, lampe.angle, lampe.penumbra, ...lampe.target?.matrixWorld.elements ?? []])].join(',');
     if(geaendert || ansicht!==this.ansicht) this.samples=0;
     this.ansicht=ansicht;
     const u=this.uniforms;
     u.inverseProjektion.value=kamera.projectionMatrixInverse; u.kameraWelt.value=kamera.matrixWorld;
-    u.sonnenRichtung.value.subVectors(sonne.position,sonne.target.position).normalize();
-    u.sonnenFarbe.value.copy(sonne.color).multiplyScalar(sonne.intensity);
+    u.mondRichtung.value.subVectors(mond.position,mond.target.position).normalize();
+    u.mondFarbe.value.copy(mond.color).multiplyScalar(mond.intensity);
+    u.lampenAnzahl.value = Math.min(lampen.length, u.lampenPosition.value.length);
+    for (let i = 0; i < u.lampenAnzahl.value; i++) {
+      const lampe = lampen[i];
+      lampe.getWorldPosition(this.lichtOrt);
+      const { x, y, z } = this.lichtOrt;
+      const innen = lampe.isSpotLight ? Math.cos(lampe.angle * (1 - lampe.penumbra)) : 0;
+      u.lampenPosition.value[i].set(x, y, z, innen);
+      const { r, g, b } = lampe.color;
+      u.lampenFarbe.value[i].set(r * lampe.intensity, g * lampe.intensity, b * lampe.intensity, lampe.distance);
+      const richtung = u.lampenRichtung.value[i];
+      if (lampe.isSpotLight) {
+        lampe.target.getWorldPosition(this.lichtRichtung).sub(this.lichtOrt).normalize();
+        richtung.set(this.lichtRichtung.x, this.lichtRichtung.y, this.lichtRichtung.z, Math.cos(lampe.angle));
+      } else {
+        richtung.set(0, 0, 0, -1);
+      }
+    }
     u.samples.value=this.samples; u.saat.value=++this.saat;
     const ziel=this.ziele[1], vorher=this.ziele[0]; u.vorher.value=vorher.texture;
     try {
@@ -372,7 +442,7 @@ export class Pathtracing {
     // Sie werden als UI-Overlay gezeichnet und gehören nicht zur Lichtsimulation.
     const versteckt=[];
     const hintergrund=szene.background, autoClear=this.zeichner.autoClear;
-    szene.traverse(o=> { if(o.isMesh && o.visible && !o.userData.ohneSchatten) { o.visible=false; versteckt.push(o); } });
+    szene.traverse(o=> { if(o.visible && ((o.isMesh && !o.userData.ohneSchatten) || o.userData.lichtHalo)) { o.visible=false; versteckt.push(o); } });
     try {
       szene.background=null; this.zeichner.autoClear=false; this.zeichner.clearDepth();
       this.zeichner.render(szene,kamera);

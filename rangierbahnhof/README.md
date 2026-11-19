@@ -62,6 +62,11 @@ bei Fehlern einen Hinweis mit Zeilennummer.
 mit der rechten Maustaste verschiebt. Oben rechts gibt es drei feste
 Blickwinkel.
 
+**Nachtbeleuchtung.** Warme Flutlichter beleuchten Gleise und Fahrzeuge.
+Die roten und grünen Signallaternen färben ihre direkte Umgebung.
+Auf poliertem Stahl und lackierten Fahrzeugteilen sind die Reflexe besonders
+aus flachen Blickwinkeln sichtbar.
+
 **Raymarching.** Der Schalter aktiviert Parallax Occlusion Mapping. Der
 Shader folgt dem Blickstrahl durch die Tiefenkarte und versetzt die
 Materialtexturen am gefundenen Schnittpunkt. So wirkt das Relief von
@@ -87,8 +92,8 @@ Die Auswahl wird lokal gespeichert. Ohne Auswahl läuft der Rasterrenderer.
 Pathtracing setzt `EXT_color_buffer_float` voraus. Raymarching und Pathtracing
 sind getrennte Ansichtsmodi.
 
-Der Pathtracer berechnet Dreieckschnittpunkte über eine BVH, direkte Sonne mit
-weichen Schatten, Himmelslicht, emissive Materialien und bis zu fünf Pfadsegmente
+Der Pathtracer berechnet Dreieckschnittpunkte über eine BVH, weiche Schatten,
+Mond- und Laternenlicht, emissive Materialien und bis zu fünf Pfadsegmente
 mit diffusen und näherungsweise rauen metallischen Reflexionen. Er übernimmt
 instanzierte Geometrie, Materialfarben, Instanzfarben und Farbtexturen aus der
 bestehenden Szene. Bewegte Geometrie aktualisiert die BVH, ohne sie neu aufzubauen.

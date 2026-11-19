@@ -312,7 +312,7 @@ function baueContainer(gruppe, nummer, farbe) {
 
 function baueKessel(gruppe, nummer, farbe) {
   const mitte = DECK + 1.5;
-  const lack = stoff(farbe, 0.38, 0.25);
+  const lack = pbrMaterial(farbe, 'lack');
   gruppe.add(walzeX(1.2, 6.2, lack, 0, mitte, 0, 28));
   for (const seite of [-1, 1]) {
     const kappe = koerper(new THREE.SphereGeometry(1.2, 24, 14), lack, seite * 3.1, mitte, 0);
@@ -406,8 +406,8 @@ export class Lok extends Fahrzeug {
     const g = new THREE.Group();
     const raeder = [];
     const laenge = 9.6;
-    const rot = stoff(0xb3261e, 0.45, 0.2);
-    const rotDunkel = stoff(0x8c1d17, 0.5, 0.2);
+    const rot = pbrMaterial(0xb3261e, 'lack');
+    const rotDunkel = pbrMaterial(0x8c1d17, 'lack');
     const grau = stoff(0xc4c7c9, 0.6, 0.15);
     const gelb = stoff(0xf0c010, 0.5, 0.1);
     const boden = Y0 + 1.37;   // Oberkante des Umlaufs
