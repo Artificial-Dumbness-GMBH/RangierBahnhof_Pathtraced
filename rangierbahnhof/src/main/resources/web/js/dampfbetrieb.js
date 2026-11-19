@@ -49,7 +49,7 @@ export class Dampfbetrieb {
         this.brennstoff = 0;
         this.kaufeAutomatisch();
       }
-      if (genutzt < dauer) break;
+      if (genutzt <= 0) break;
     }
     this.zeige();
     return sekunden - rest;

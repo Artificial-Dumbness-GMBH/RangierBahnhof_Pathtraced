@@ -23,6 +23,7 @@ welt.fahrzeuge.add(lok.gruppe);
 const dampfbetrieb = new Dampfbetrieb(lok, welt, erinnere('dampflok'), (stand) => merke('dampflok', stand));
 
 let sortierAnfrage = 0;
+let offenerBefehl = null;
 
 const detailWaggons = new Map(); // Nummer -> detailliertes Modell
 let waggonLager = new Map();    // Nummer -> aktuell aufgestellter Waggon
@@ -45,6 +46,7 @@ const zustand = {
   haltNachZug: false,
   lauf: null,
   tempo: 2,
+  zeitBoost: false,
   verbunden: false,
   kennung: null,
   kameraArt: 'uebersicht',
@@ -122,6 +124,7 @@ function baueAuf(start) {
 /** Setzt alles auf die Startbelegung zurück. */
 function stelleStartHer() {
   sortierAnfrage++;
+  offenerBefehl = null;
   zustand.lauf = null;
   zustand.laeuft = true;
   zustand.vorspulen = false;
@@ -150,12 +153,18 @@ function verschiebe(von, nach, beiEnde) {
   zustand.logisch[nach].push(nummer);
   waggonLager.get(nummer).gleis = nach;
   zustand.zaehler++;
-  $('befehl').textContent = `verschiebeWaggon(gleis${von}, gleis${nach});`;
+  offenerBefehl = `verschiebeWaggon(gleis${von}, gleis${nach});`;
+  zustand.betrieb.reihe(von, nach, null, beiEnde);
+  if (!zustand.zeitBoost) zeichneVerschiebung();
+  return true;
+}
+
+function zeichneVerschiebung() {
+  $('befehl').textContent = offenerBefehl;
+  offenerBefehl = null;
   zeichneGleisbild();
   zeichneZaehler();
-  zustand.betrieb.reihe(von, nach, null, beiEnde);
   stelleTastenEin();
-  return true;
 }
 
 function istSortiert() {
@@ -500,13 +509,17 @@ async function pruefeVerbindung() {
 
 // ---------------------------------------------------------------- Tempo
 
-function setzeTempo(regler) {
+function setzeTempo() {
+  const regler = Number($('tempo').value);
   // Bis zur bisherigen Standardstellung bleibt 2× am selben Reglerpunkt.
-  zustand.tempo = regler <= 45
+  const regTempo = regler <= 45
     ? 0.5 * Math.pow(4, regler / 45)
     : 2 * Math.pow(50, (regler - 45) / 55);
+  zustand.tempo = zustand.zeitBoost ? 10000 : regTempo;
   const zahl = zustand.tempo >= 10 ? Math.round(zustand.tempo) : Math.round(zustand.tempo * 10) / 10;
-  $('tempoWert').textContent = String(zahl).replace('.', ',') + '×';
+  $('tempoWert').textContent = zahl.toLocaleString('de-DE') + '×';
+  $('tempo').disabled = zustand.zeitBoost;
+  $('zeitBoost').setAttribute('aria-pressed', String(zustand.zeitBoost));
 }
 
 // ------------------------------------------------------------ Bedienung
@@ -577,8 +590,12 @@ $('zumEnde').addEventListener('click', () => {
 });
 $('zumEndeHand').addEventListener('click', wechsleVorspulen);
 $('tempo').addEventListener('input', () => {
-  setzeTempo(Number($('tempo').value));
+  setzeTempo();
   merke('tempo', $('tempo').value);
+});
+$('zeitBoost').addEventListener('click', () => {
+  zustand.zeitBoost = !zustand.zeitBoost;
+  setzeTempo();
 });
 for (const knopf of document.querySelectorAll('[data-kamera]')) {
   knopf.addEventListener('click', () => stelleKameraEin(knopf.dataset.kamera));
@@ -650,7 +667,7 @@ if ([...$('anzahl').options].some((option) => option.value === gemerkteAnzahl)) 
 }
 const gemerktesTempo = erinnere('tempo');
 if (gemerktesTempo !== null && gemerktesTempo !== '') $('tempo').value = gemerktesTempo;
-setzeTempo(Number($('tempo').value));
+setzeTempo();
 if (erinnere('modus') === 'algo') zustand.modus = 'algo';
 
 baueAuf(wuerfle(Number($('anzahl').value)));
@@ -700,6 +717,8 @@ function bild(jetzt) {
     if (zustand.vorspulen) spuleVor();
     else fahrzeit = fahre(dt * zustand.tempo);
   }
+  // Beim Boost genügt der letzte Rangierbefehl pro Bild.
+  if (offenerBefehl !== null) zeichneVerschiebung();
   dampfbetrieb.effekte.schritt(dt, fahrzeit);
   kamera.schritt(dt);
   welt.markiere(zustand.schwebend, zustand.gewaehlt);

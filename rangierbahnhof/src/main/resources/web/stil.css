@@ -434,7 +434,7 @@ select {
 
 .tempo label { flex: none; }
 .tempo input { flex: 1; min-width: 80px; accent-color: var(--tinte); }
-.tempo output { flex: none; width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.tempo output { flex: none; min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Schmale Fenster und Beamer: Felder enger, die Weiche im Gleisbild entfällt */
 @media (max-width: 1240px) {
