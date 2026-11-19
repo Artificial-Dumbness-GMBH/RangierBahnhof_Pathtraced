@@ -27,6 +27,7 @@ final class Webserver {
     static final String PROGRAMM = "rangierbahnhof";
 
     private final HttpServer server;
+    private final Uranpreis uranpreis = new Uranpreis();
     private final String kennung = Long.toString(System.currentTimeMillis(), 36);
     private volatile long letzterKontakt = 0;
 
@@ -34,6 +35,7 @@ final class Webserver {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), pPort), 0);
         server.createContext("/", this::liefereDatei);
         server.createContext("/api/status", this::liefereStatus);
+        server.createContext("/api/uranpreis", this::liefereUranpreis);
         server.createContext("/api/sortiere", this::fuehreSortierenAus);
         server.createContext("/api/beenden", this::beende);
         server.setExecutor(Executors.newCachedThreadPool(auftrag -> {
@@ -50,6 +52,10 @@ final class Webserver {
         letzterKontakt = System.currentTimeMillis();
         sende(pAnfrage, 200, "application/json",
                 "{\"programm\":\"" + PROGRAMM + "\",\"kennung\":\"" + kennung + "\"}");
+    }
+
+    private void liefereUranpreis(HttpExchange pAnfrage) throws IOException {
+        sende(pAnfrage, 200, "application/json", uranpreis.alsJson());
     }
 
     private void fuehreSortierenAus(HttpExchange pAnfrage) throws IOException {

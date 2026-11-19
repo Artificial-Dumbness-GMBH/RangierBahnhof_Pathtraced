@@ -32,6 +32,25 @@
     <p id="hinweisMaus">Ziehen dreht die Ansicht, das Mausrad zoomt, Rechtsklick-Ziehen verschiebt.</p>
   </main>
 
+  <section id="lokpult" aria-label="Dampflok und Atommüll-Depot">
+    <div class="lokanzeige">
+      <span id="lokstatus" role="status">Dampflok bereit</span>
+      <progress id="brennstab" max="90" value="90" aria-label="Brennstabfüllstand" title="90 Simulationssekunden im Rangierbetrieb pro Brennstab"></progress>
+      <span id="brennstabProzent">100 %</span>
+    </div>
+    <button type="button" id="brennstabKaufen" disabled>Brennstab kaufen</button>
+    <span id="depotstand">Atommüll-Depot · 0 Fässer</span>
+    <details id="uranmarkt">
+      <summary>Preis &amp; Ausgaben</summary>
+      <div>
+        <p id="urankurs"></p>
+        <p id="uranausgaben"></p>
+        <a href="https://www.cameco.com/invest/markets/uranium-price" target="_blank" rel="noopener">Kursquelle Cameco</a>
+      </div>
+    </details>
+    <button type="button" id="az5" title="Löst die Explosion im Spiel aus">AZ‑5</button>
+  </section>
+
   <section id="pult" aria-label="Stellpult">
     <div class="feld" id="feldModus">
       <div class="umschalter" role="group" aria-label="Betriebsart">

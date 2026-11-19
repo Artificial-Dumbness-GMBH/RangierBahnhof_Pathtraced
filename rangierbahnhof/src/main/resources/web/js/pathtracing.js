@@ -438,7 +438,7 @@ export class Pathtracing {
       this.zeichner.render(this.szene,this.kamera);
     } finally { this.zeichner.setRenderTarget(null); }
     this.ziele.reverse(); this.samples=Math.min(this.samples+1,4096);
-    // Schilder, Nummern und transparente Gleismarkierungen bleiben bedienbar.
+    // Schilder, Effekte und transparente Gleismarkierungen bleiben sichtbar.
     // Sie werden als UI-Overlay gezeichnet und gehören nicht zur Lichtsimulation.
     const versteckt=[];
     const hintergrund=szene.background, autoClear=this.zeichner.autoClear;

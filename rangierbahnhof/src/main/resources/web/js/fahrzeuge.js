@@ -147,37 +147,6 @@ function texNummernschild(nummer) {
   });
 }
 
-function texMarke(nummer, farbe, gewaehlt) {
-  return textur(192, 192, (c) => {
-    c.beginPath(); c.arc(96, 96, 88, 0, 7);
-    c.fillStyle = gewaehlt ? '#f2c200' : '#fbfaf5';
-    c.fill();
-    c.lineWidth = 16;
-    c.strokeStyle = farbe;
-    c.stroke();
-    c.lineWidth = 4;
-    c.strokeStyle = '#1d211c';
-    c.beginPath(); c.arc(96, 96, 94, 0, 7); c.stroke();
-    c.fillStyle = '#1d211c';
-    c.font = `700 ${nummer > 99 ? 72 : nummer > 9 ? 96 : 120}px ${SCHRIFT}`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(String(nummer), 96, 104);
-  });
-}
-
-function texSchrift(text, breite, hoehe, hintergrund, farbe) {
-  return textur(breite, hoehe, (c, b, h) => {
-    c.fillStyle = hintergrund;
-    c.fillRect(0, 0, b, h);
-    c.fillStyle = farbe;
-    c.font = `700 ${Math.round(h * 0.62)}px ${SCHRIFT}`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(text, b / 2, h * 0.56);
-  });
-}
-
 // -------------------------------------------------------------- Fahrzeug
 
 /** Ein Fahrzeug, das sich entlang einer Fahrstraße aufstellen lässt. */
@@ -277,6 +246,7 @@ function baueSchilder(gruppe, nummer, y, zAussen, x = 0) {
   const hinten = koerper(geo, mat, -x, y, -zAussen - 0.015);
   hinten.rotation.y = Math.PI;
   gruppe.add(vorn, hinten);
+  return mat;
 }
 
 function baueGedeckt(gruppe, nummer, farbe) {
@@ -288,8 +258,7 @@ function baueGedeckt(gruppe, nummer, farbe) {
     gruppe.add(quader(1.9, 2.25, 0.06, tuer, 0.9, DECK + 1.2, z));
     gruppe.add(quader(4.1, 0.08, 0.08, matDunkel(), 0.2, DECK + 2.4, z));  // Laufschiene der Schiebetür
   }
-  baueSchilder(gruppe, nummer, DECK + 1.45, 1.375, -2.35);
-  return DECK + 2.97;
+  return baueSchilder(gruppe, nummer, DECK + 1.45, 1.375, -2.35);
 }
 
 function baueContainer(gruppe, nummer, farbe) {
@@ -306,8 +275,7 @@ function baueContainer(gruppe, nummer, farbe) {
     gruppe.add(quader(7.3, 0.14, 0.14, kante, 0, DECK + 2.71, z));
     gruppe.add(quader(7.3, 0.14, 0.14, kante, 0, DECK + 0.17, z));
   }
-  baueSchilder(gruppe, nummer, DECK + 1.42, 1.25, 0);
-  return DECK + 2.75;
+  return baueSchilder(gruppe, nummer, DECK + 1.42, 1.25, 0);
 }
 
 function baueKessel(gruppe, nummer, farbe) {
@@ -330,8 +298,7 @@ function baueKessel(gruppe, nummer, farbe) {
   for (let i = 0; i < 6; i++) {
     gruppe.add(quader(0.5, 0.04, 0.04, matDunkel(), 1.6, DECK + 0.3 + i * 0.42, 1.26));
   }
-  baueSchilder(gruppe, nummer, mitte, 1.21, -0.9);
-  return mitte + 1.56;
+  return baueSchilder(gruppe, nummer, mitte, 1.21, -0.9);
 }
 
 function baueOffen(gruppe, nummer, farbe) {
@@ -357,8 +324,7 @@ function baueOffen(gruppe, nummer, farbe) {
   const haufen = koerper(new THREE.SphereGeometry(1, 11, 7), ladung, 0, DECK + 1.15, 0);
   haufen.scale.set(3.55, 0.85, 1.2);
   gruppe.add(haufen);
-  baueSchilder(gruppe, nummer, DECK + 0.88, 1.42, 0);
-  return DECK + 2.0;
+  return baueSchilder(gruppe, nummer, DECK + 0.88, 1.42, 0);
 }
 
 const BAUARTEN = [baueGedeckt, baueContainer, baueKessel, baueOffen];
@@ -370,165 +336,88 @@ export class Waggon extends Fahrzeug {
     const raeder = [];
     const farbe = farbeVon(nummer);
     baueUntergestell(gruppe, raeder);
-    const hoehe = BAUARTEN[(nummer - 1) % BAUARTEN.length](gruppe, nummer, farbe);
+    const schild = BAUARTEN[(nummer - 1) % BAUARTEN.length](gruppe, nummer, farbe);
     super(gruppe, { achsstand: 5.0, raeder, radius: 0.46 });
     this.nummer = nummer;
-
-    // Schwebende Nummernmarke: dreht sich immer zur Kamera und bleibt so aus
-    // jeder Richtung lesbar, auch von oben.
-    this.texNormal = texMarke(nummer, farbe, false);
-    this.texGewaehlt = texMarke(nummer, farbe, true);
-    this.marke = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texNormal }));
-    this.hoehe = hoehe;
-    this.gewaehlt = false;
-    this.marke.position.set(0, hoehe + 1.55, 0);
-    this.marke.scale.set(2.3, 2.3, 1);
-    gruppe.add(this.marke);
+    this.schild = schild;
   }
 
   setzeAuswahl(gewaehlt) {
-    this.gewaehlt = gewaehlt;
-    this.marke.material.map = gewaehlt ? this.texGewaehlt : this.texNormal;
-  }
-
-  /** Passt die Nummernmarke an die Kamera an, damit sie lesbar bleibt. */
-  zeigeMarke(welt) {
-    const groesse = welt.lesbareGroesse(this.marke, this.gewaehlt ? 3.0 : 2.3, this.gewaehlt ? 0.044 : 0.034);
-    this.marke.position.y = this.hoehe + 0.4 + groesse / 2;
+    this.schild.emissive.setHex(gewaehlt ? 0xc99315 : 0);
   }
 }
 
 // ------------------------------------------------------------------- Lok
 
-/** Die Rangierlok: Diesellok mit langem Vorbau, Führerhaus und Kuppelstangen. */
+/** Dampfrangierlok mit Rauchkammer, Schornstein und gekuppelten Treibrädern. */
 export class Lok extends Fahrzeug {
   constructor() {
     const g = new THREE.Group();
     const raeder = [];
     const laenge = 9.6;
-    const rot = pbrMaterial(0xb3261e, 'lack');
-    const rotDunkel = pbrMaterial(0x8c1d17, 'lack');
-    const grau = stoff(0xc4c7c9, 0.6, 0.15);
-    const gelb = stoff(0xf0c010, 0.5, 0.1);
-    const boden = Y0 + 1.37;   // Oberkante des Umlaufs
+    const rot = pbrMaterial(0xa92720, 'lack');
+    const gruenerLack = pbrMaterial(0x285e46, 'lack');
+    const messing = stoff(0xd4a453, 0.43, 0.65);
+    const schwarz = matDunkel();
+    const umlauf = Y0 + 1.42;
+    const kesselY = umlauf + 1.13;
+    const schornsteinX = -3.6;
 
-    // Rahmen, Umlauf, Pufferbohlen
-    g.add(quader(laenge, 0.5, 2.6, matDunkel(), 0, Y0 + 1.07, 0));
-    g.add(quader(laenge, 0.07, 2.95, einmal('umlauf', () => stoff(0x4a4d50, 0.8, 0.2)), 0, boden - 0.035, 0));
-    const warn = einmal('warn', () => {
-      const t = textur(128, 32, (c, b, h) => {
-        c.fillStyle = '#f0c010';
-        c.fillRect(0, 0, b, h);
-        c.fillStyle = '#1d211c';
-        for (let x = -h; x < b; x += 26) {
-          c.beginPath();
-          c.moveTo(x, h); c.lineTo(x + 13, h); c.lineTo(x + 13 + h, 0); c.lineTo(x + h, 0);
-          c.fill();
-        }
-      });
-      return stoff(0xffffff, 0.6, 0.1, t);
-    });
+    g.add(quader(laenge, 0.35, 2.55, rot, 0, Y0 + 1.06, 0));
+    g.add(quader(laenge, 0.1, 2.9, schwarz, 0, umlauf - 0.05, 0));
     for (const seite of [-1, 1]) {
-      g.add(quader(0.18, 0.62, 2.9, warn, seite * (laenge / 2 - 0.02), Y0 + 1.03, 0));
+      g.add(quader(0.24, 0.56, 2.85, rot, seite * (laenge / 2 - 0.12), Y0 + 1, 0));
     }
-    bauePuffer(g, laenge, Y0 + 1.0);
+    bauePuffer(g, laenge, Y0 + 1);
 
-    // Langer Vorbau (Motor) in Richtung der Waggons
-    const vorbauL = 5.4;
-    const vorbauX = -1.7;
-    g.add(quader(vorbauL, 1.6, 2.0, rot, vorbauX, boden + 0.8, 0));
-    g.add(tonnendach(vorbauL, 2.0, 0.3, rot, vorbauX, boden + 1.6));
-    const lamellen = einmal('lamellen', () => {
-      const t = textur(256, 64, (c, b, h) => {
-        c.fillStyle = '#8c1d17';
-        c.fillRect(0, 0, b, h);
-        c.fillStyle = 'rgba(0,0,0,0.5)';
-        for (let x = 6; x < b; x += 10) c.fillRect(x, 6, 4, h - 12);
-      });
-      return stoff(0xffffff, 0.6, 0.2, t);
-    });
-    for (const z of [-1.01, 1.01]) {
-      const feld = koerper(new THREE.PlaneGeometry(3.4, 0.85), lamellen, vorbauX - 0.4, boden + 0.95, z);
-      if (z < 0) feld.rotation.y = Math.PI;
-      g.add(feld);
+    g.add(walzeX(1.04, 3.95, gruenerLack, -0.95, kesselY, 0, 28));
+    g.add(walzeX(1.06, 1.42, schwarz, -3.54, kesselY, 0, 28));
+    g.add(walzeX(0.87, 0.14, matStahl(), -4.29, kesselY, 0, 28));
+    g.add(walzeX(0.14, 0.16, messing, -4.41, kesselY, 0));
+    for (const x of [-2.6, -1.3, 0.55]) {
+      g.add(walzeX(1.056, 0.075, messing, x, kesselY, 0, 28));
     }
-    const grill = einmal('grill', () => {
-      const t = textur(128, 128, (c, b, h) => {
-        c.fillStyle = '#2a2c2e';
-        c.fillRect(0, 0, b, h);
-        c.fillStyle = '#6d7175';
-        for (let y = 8; y < h; y += 12) c.fillRect(8, y, b - 16, 5);
-      });
-      return stoff(0xffffff, 0.6, 0.3, t);
-    });
-    const kuehler = koerper(new THREE.PlaneGeometry(1.5, 1.15), grill, vorbauX - vorbauL / 2 - 0.01, boden + 0.85, 0);
-    kuehler.rotation.y = -Math.PI / 2;
-    g.add(kuehler);
-    g.add(koerper(new THREE.CylinderGeometry(0.13, 0.16, 0.75, 12), matDunkel(), -3.1, boden + 2.2, 0));
+    g.add(koerper(new THREE.CylinderGeometry(0.30, 0.42, 0.92, 20),
+      schwarz, schornsteinX, kesselY + 1.46, 0));
+    g.add(koerper(new THREE.CylinderGeometry(0.46, 0.30, 0.22, 20),
+      schwarz, schornsteinX, kesselY + 1.94, 0));
+    g.add(koerper(new THREE.CylinderGeometry(0.30, 0.30, 0.025, 20),
+      stoff(0x08090a), schornsteinX, kesselY + 2.06, 0));
+    g.add(koerper(new THREE.CylinderGeometry(0.34, 0.49, 0.43, 20),
+      messing, -1.58, kesselY + 1.14, 0));
 
-    // Führerhaus
-    const hausX = 2.25;
-    g.add(quader(2.5, 2.75, 2.8, rot, hausX, boden + 1.375, 0));
-    g.add(quader(2.9, 0.12, 3.05, grau, hausX, boden + 2.81, 0));
-    g.add(tonnendach(2.9, 3.05, 0.22, grau, hausX, boden + 2.87));
-    for (const z of [-1.405, 1.405]) {
-      const fenster = koerper(new THREE.PlaneGeometry(1.55, 0.95), matGlas(), hausX, boden + 2.0, z);
-      if (z < 0) fenster.rotation.y = Math.PI;
-      g.add(fenster);
-      const name = koerper(new THREE.PlaneGeometry(1.3, 0.42),
-        new THREE.MeshStandardMaterial({ map: texSchrift('Lok 1', 256, 84, '#f7f5ee', '#1d211c'), roughness: 0.6 }),
-        hausX, boden + 0.85, z + Math.sign(z) * 0.002);
-      if (z < 0) name.rotation.y = Math.PI;
-      g.add(name);
-    }
-    for (const seite of [-1, 1]) {
-      for (const z of [-0.78, 0.78]) {
-        const fenster = koerper(new THREE.PlaneGeometry(0.85, 0.8), matGlas(), hausX + seite * 1.255, boden + 2.1, z);
-        fenster.rotation.y = seite * Math.PI / 2;
-        g.add(fenster);
-      }
-    }
+    const hausX = 2.37;
+    g.add(quader(2.65, 2.68, 2.77, gruenerLack, hausX, umlauf + 1.34, 0));
+    g.add(quader(2.93, 0.12, 3.06, schwarz, hausX, umlauf + 2.7, 0));
+    g.add(tonnendach(2.93, 3.06, 0.32, schwarz, hausX, umlauf + 2.76));
+    g.add(quader(1.12, 1.58, 2.56, schwarz, 4.2, umlauf + 0.79, 0));
 
-    // Kurzer Vorbau zum Ausziehgleis hin
-    g.add(quader(1.25, 1.25, 2.0, rotDunkel, 4.12, boden + 0.625, 0));
-
-    // Lampen
     const licht = einmal('licht', () => new THREE.MeshStandardMaterial({
       color: 0xfff3c4, emissive: 0xffe9a0, emissiveIntensity: 1.6, roughness: 0.3,
     }));
-    const lampe = einmal('lampengeo', () => {
-      const geo = new THREE.CylinderGeometry(0.15, 0.15, 0.06, 14);
-      geo.rotateZ(Math.PI / 2);
-      return geo;
-    });
-    for (const z of [-0.7, 0.7]) {
-      g.add(koerper(lampe, licht, vorbauX - vorbauL / 2 - 0.03, boden + 0.25, z));
-      g.add(koerper(lampe, licht, 4.76, boden + 0.25, z));
-    }
-    g.add(koerper(lampe, licht, vorbauX - vorbauL / 2 - 0.03, boden + 1.5, 0));
-    g.add(koerper(lampe, licht, hausX + 1.26, boden + 2.62, 0));
-
-    // Geländer
-    for (const z of [-1.4, 1.4]) {
-      g.add(walzeX(0.035, 5.5, gelb, vorbauX - 0.05, boden + 1.0, z, 8));
-      for (let x = -4.4; x <= 1.0; x += 1.35) {
-        g.add(koerper(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8), gelb, x, boden + 0.5, z));
+    for (const seite of [-1, 1]) {
+      const z = seite * 1.394;
+      g.add(quader(1.56, 0.97, 0.035, messing, hausX, umlauf + 1.94, z));
+      g.add(quader(1.43, 0.85, 0.05, matGlas(), hausX, umlauf + 1.94, z));
+      g.add(quader(0.055, 0.88, 0.06, messing, hausX, umlauf + 1.94, z));
+      g.add(quader(1.9, 0.08, 0.32, schwarz, 2.62, Y0 + 0.72, seite * 1.42));
+      g.add(quader(0.76, 0.37, 0.44, schwarz, -3.37, Y0 + 0.67, seite * 1.02));
+      for (const x of [-4.47, 4.72]) {
+        g.add(walzeX(0.14, 0.18, licht, x, umlauf + 0.32, seite * 0.92, 14));
       }
-      g.add(quader(0.5, 0.06, 0.3, matDunkel(), 1.15, Y0 + 0.75, z + Math.sign(z) * 0.05));   // Tritt
-      g.add(quader(0.5, 0.06, 0.3, matDunkel(), 3.35, Y0 + 0.75, z + Math.sign(z) * 0.05));
     }
 
-    // Drei Radsätze mit Kuppelstangen
-    const radius = 0.6;
+    const radius = 0.70;
     for (const x of [-2.3, 0, 2.3]) baueRadsatz(g, raeder, x, radius, '#a3231c');
     const stangen = [];
-    for (const z of [-0.86, 0.86]) {
-      const stange = quader(5.0, 0.13, 0.06, matStahl(), 0, Y0 + radius, z);
+    for (const z of [-0.87, 0.87]) {
+      const stange = quader(5.0, 0.14, 0.08, matStahl(), 0, Y0 + radius, z);
       g.add(stange);
       stangen.push({ koerper: stange, x: 0, y: Y0 + radius, kurbel: 0.27, versatz: z > 0 ? 0 : Math.PI / 2 });
     }
 
     super(g, { achsstand: 4.6, raeder, radius, stangen });
+    this.schornstein = new THREE.Vector3(schornsteinX, kesselY + 2.13, 0);
     this.rolle(0);
   }
 }

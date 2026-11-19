@@ -162,6 +162,10 @@ export class Welt {
         if (o.geometry) o.geometry.dispose();
         if (o.isSpotLight) o.shadow.dispose();
         if (o.userData.lichtHalo) o.material.dispose();
+        if (o.userData.depotSchild) {
+          o.material.map.dispose();
+          o.material.dispose();
+        }
       });
     }
     this.plan = plan;
@@ -182,6 +186,7 @@ export class Welt {
     }
     g.add(this.bauePrellbock(plan.xEnde + 0.55, 0, -1));
     this.baueWeg(g, plan);
+    this.baueDepot(g, plan.xKurve - 6, D + 5.5);
     this.baueStellwerk(g, plan.xKurve + 9, -(D + 13));
     this.baueSchuppen(g, plan.xPrellbock + 15, -(D + 13));
     for (const anteil of [0.14, 0.47, 0.8]) {
@@ -207,6 +212,51 @@ export class Welt {
     s.near = 20; s.far = 380;
     s.updateProjectionMatrix();
     this.setzeFahrstrasse('B');
+  }
+
+  baueDepot(g, x, z) {
+    const depot = new THREE.Group();
+    depot.position.set(x, 0, z);
+    g.add(depot);
+
+    const beton = pbrMaterial(0x73766a, 'stahl');
+    const metall = pbrMaterial(0x3d433b, 'stahl');
+    const gelb = pbrMaterial(0xc9a52e, 'lack');
+    depot.add(quader(8.2, 0.18, 3.65, beton, 0, 0.09, 0));
+    for (const seite of [-1, 1]) {
+      depot.add(quader(0.16, 0.62, 3.65, metall, seite * 4, 0.42, 0));
+    }
+    depot.add(quader(8.2, 0.62, 0.16, metall, 0, 0.42, -1.75));
+
+    const karte = schildTextur('☢', '#e2b83d', '#1e211c', '#242720');
+    const schildMaterial = new THREE.MeshStandardMaterial({
+      map: karte, emissiveMap: karte, emissive: 0xffffff, emissiveIntensity: 0.3,
+    });
+    depot.add(quader(1.14, 1.05, 0.12, metall, -3.37, 1.37, 1.51));
+    const schild = new THREE.Mesh(new THREE.PlaneGeometry(0.91, 0.91), schildMaterial);
+    schild.position.set(-3.37, 1.37, 1.58);
+    schild.userData.depotSchild = true;
+    depot.add(schild);
+
+    const fass = new THREE.CylinderGeometry(0.39, 0.39, 0.76, 12);
+    const ring = new THREE.CylinderGeometry(0.405, 0.405, 0.08, 12);
+    this.depotFaesser = Array.from({ length: 12 }, (_, i) => {
+      const abfall = new THREE.Group();
+      abfall.position.set(-2.13 + (i % 6) * 1.05, 0.56, 0.61 - Math.floor(i / 6) * 1.21);
+      abfall.add(new THREE.Mesh(fass, gelb));
+      for (const y of [-0.24, 0.24]) {
+        const reif = new THREE.Mesh(ring, metall);
+        reif.position.y = y;
+        abfall.add(reif);
+      }
+      depot.add(abfall);
+      return abfall;
+    });
+    this.fuelleDepot(0);
+  }
+
+  fuelleDepot(anzahl) {
+    this.depotFaesser.forEach((fass, i) => { fass.visible = i < anzahl; });
   }
 
   baueBettung(g, plan) {

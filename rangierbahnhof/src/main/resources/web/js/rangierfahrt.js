@@ -50,23 +50,19 @@ export class Rangierbetrieb {
     this.warteschlange.push({ von, nach, beiStart, beiEnde });
   }
 
-  /** Lässt die Zeit dt (Sekunden, bereits mit dem Tempo multipliziert) vergehen. */
+  /** Lässt höchstens dt Simulationssekunden vergehen und liefert die genutzte Zeit. */
   schritt(dt) {
     let rest = dt;
     let wache = 0;
     while (rest > 0 && wache++ < 200) {
       if (!this.aktuell) {
         const auftrag = this.warteschlange.shift();
-        if (!auftrag) return;
+        if (!auftrag) break;
         this.beginne(auftrag);
         if (!this.aktuell) continue;
       }
       const a = this.aktuell;
       const teil = a.teile[a.index];
-      if (!teil) {
-        this.beende();
-        continue;
-      }
       if (!teil.begonnen) {
         teil.begonnen = true;
         teil.zeit = 0;
@@ -84,10 +80,12 @@ export class Rangierbetrieb {
         rest = teil.zeit - teil.dauer;
         if (teil.amEnde) teil.amEnde();
         a.index++;
+        if (a.index === a.teile.length) this.beende();
       } else {
         rest = 0;
       }
     }
+    return dt - rest;
   }
 
   beginne(auftrag) {
@@ -99,7 +97,7 @@ export class Rangierbetrieb {
       return;
     }
     const waggon = quelle[quelle.length - 1];
-    const a = { auftrag, waggon, teile: [], index: 0, gekuppelt: false, abgestellt: false };
+    const a = { auftrag, waggon, teile: [], index: 0, gekuppelt: false };
     const fahrt = (gleis, start, ziel) => {
       if (Math.abs(ziel - start) < 0.01) return;
       a.teile.push({ art: 'fahrt', gleis, von: start, nach: ziel, dauer: Math.max(0.25, Math.abs(ziel - start) / TEMPO_MS + 0.3) });
@@ -129,10 +127,7 @@ export class Rangierbetrieb {
   }
 
   stelleAb(a) {
-    if (a.abgestellt) return;
-    if (!a.gekuppelt) this.gleise[a.auftrag.von].pop();
     a.gekuppelt = false;
-    a.abgestellt = true;
     this.gleise[a.auftrag.nach].push(a.waggon);
     this.lokGleis = a.auftrag.nach;
   }
@@ -141,36 +136,6 @@ export class Rangierbetrieb {
     const a = this.aktuell;
     this.aktuell = null;
     if (a.auftrag.beiEnde) a.auftrag.beiEnde();
-  }
-
-  /** Führt alle offenen Verschiebungen sofort aus, ohne die Fahrten zu zeigen. */
-  springeAnsEnde() {
-    let letztesGleis = null;
-    if (this.aktuell) {
-      const a = this.aktuell;
-      this.stelleAb(a);
-      letztesGleis = a.auftrag.nach;
-      this.aktuell = null;
-      if (a.auftrag.beiEnde) a.auftrag.beiEnde();
-    }
-    // beiEnde kann neue Aufträge einreihen, deshalb eine Schleife statt forEach
-    let wache = 0;
-    while (this.warteschlange.length > 0 && wache++ < 100000) {
-      const auftrag = this.warteschlange.shift();
-      if (auftrag.beiStart) auftrag.beiStart();
-      const quelle = this.gleise[auftrag.von];
-      if (quelle.length > 0) {
-        this.gleise[auftrag.nach].push(quelle.pop());
-        letztesGleis = auftrag.nach;
-      }
-      if (auftrag.beiEnde) auftrag.beiEnde();
-    }
-    if (letztesGleis) {
-      this.lokGleis = letztesGleis;
-      this.lokU = this.plan.uPlatz(letztesGleis, this.gleise[letztesGleis].length - 1) - KUPPEL;
-      this.welt.setzeFahrstrasse(letztesGleis);
-    }
-    this.stelleAllesHin();
   }
 
   stelleAllesHin() {

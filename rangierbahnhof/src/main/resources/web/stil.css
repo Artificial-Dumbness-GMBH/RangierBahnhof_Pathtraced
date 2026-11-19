@@ -153,6 +153,46 @@ ol { padding: 0; list-style: none; }
 
 /* ------------------------------------------------------------- Pult */
 
+#lokpult {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 14px;
+  flex: none;
+  padding: 7px 14px 9px;
+  border-top: 2px solid var(--tinte);
+  background: var(--pult);
+  font-size: 14px;
+}
+
+.lokanzeige {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#lokstatus { font-weight: 700; }
+#brennstab { width: clamp(52px, 7vw, 100px); accent-color: #427d4c; }
+#brennstabProzent { min-width: 4ch; font-variant-numeric: tabular-nums; }
+#uranmarkt { position: relative; }
+#uranmarkt summary { cursor: pointer; }
+#uranmarkt > div {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  bottom: calc(100% + 7px);
+  width: min(270px, 85vw);
+  padding: 9px 12px;
+  border: 2px solid var(--tinte);
+  border-radius: 3px;
+  background: #f1f3ea;
+}
+#uranmarkt p { margin-bottom: 4px; }
+#uranmarkt a { color: #204a74; }
+#az5 { margin-left: auto; font-weight: 800; }
+#az5:not(:disabled) { color: #fff5ec; background: #a3241f; }
+#az5:hover:not(:disabled) { background: #ca3129; }
+
 #pult {
   flex: none;
   min-height: 172px;
@@ -398,4 +438,10 @@ select {
   .feld + .feld { border-left: 0; border-top: 2px solid var(--pult-tief); }
   #feldModus, #gleisbild, #feldAnzeige { flex-basis: 100%; }
   #hinweisMaus { display: none; }
+}
+
+@media (max-width: 580px) {
+  #pult { max-height: 38dvh; overflow-y: auto; }
+  #lokpult { gap: 6px 10px; }
+  #uranmarkt > div { position: static; }
 }

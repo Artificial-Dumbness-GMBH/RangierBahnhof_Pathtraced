@@ -10,6 +10,7 @@ import * as THREE from './lib/three.module.js';
 import { Gleisplan, GLEISE, MASSE } from './gleisplan.js';
 import { Welt } from './szene.js';
 import { Lok, Waggon, farbeVon } from './fahrzeuge.js';
+import { Dampfbetrieb } from './dampfbetrieb.js';
 import { Rangierbetrieb } from './rangierfahrt.js';
 import { Kamerafuehrung } from './kamera.js';
 
@@ -19,6 +20,9 @@ const welt = new Welt($('szene'));
 const kamera = new Kamerafuehrung(welt.kamera, $('szene'));
 const lok = new Lok();
 welt.fahrzeuge.add(lok.gruppe);
+const dampfbetrieb = new Dampfbetrieb(lok, welt, erinnere('dampflok'), (stand) => merke('dampflok', stand));
+
+let sortierAnfrage = 0;
 
 const waggonLager = new Map();   // Nummer -> Waggon (wird wiederverwendet)
 
@@ -74,6 +78,7 @@ function baueAuf(start) {
   if (neuePlanung) {
     zustand.plan = new Gleisplan(start.length);
     welt.baue(zustand.plan);
+    welt.fuelleDepot(dampfbetrieb.faesser);
     zustand.betrieb = new Rangierbetrieb(zustand.plan, lok, welt);
   }
   for (const w of zustand.waggons) welt.fahrzeuge.remove(w.gruppe);
@@ -93,6 +98,7 @@ function baueAuf(start) {
 
 /** Setzt alles auf die Startbelegung zurück. */
 function stelleStartHer() {
+  sortierAnfrage++;
   zustand.lauf = null;
   zustand.laeuft = true;
   zustand.haltNachZug = false;
@@ -151,7 +157,7 @@ function waehle(gleis) {
 }
 
 function klickeGleis(gleis) {
-  if (zustand.modus !== 'hand') return;
+  if (zustand.modus !== 'hand' || !dampfbetrieb.fahrbereit) return;
   if (zustand.gewaehlt === null) {
     const reihe = zustand.logisch[gleis];
     if (reihe.length === 0) {
@@ -184,11 +190,13 @@ function zeigeHandErfolg() {
 // ----------------------------------------------------------- Algorithmus
 
 async function fuehreAlgorithmusAus() {
+  if (!dampfbetrieb.fahrbereit) return;
   if (!zustand.verbunden) {
     melde('Keine Verbindung zum Java-Programm. In VS Code die Klasse Main starten.', 'schlecht');
     return;
   }
   stelleStartHer();
+  const anfrage = sortierAnfrage;
   melde('sortiere() läuft …');
   let ergebnis;
   try {
@@ -196,9 +204,11 @@ async function fuehreAlgorithmusAus() {
     if (!antwort.ok) throw new Error(await antwort.text());
     ergebnis = await antwort.json();
   } catch (fehler) {
+    if (anfrage !== sortierAnfrage) return;
     melde('Das Java-Programm hat nicht geantwortet. Läuft die Klasse Main noch?', 'schlecht');
     return;
   }
+  if (anfrage !== sortierAnfrage) return;
   zeichneCheckliste(ergebnis.checkliste);
   const lauf = { zuege: ergebnis.zuege, index: 0, ergebnis, fertig: false };
   zustand.lauf = lauf;
@@ -254,7 +264,11 @@ function melde(text, art = '') {
 }
 
 function zeigeGrundmeldung() {
-  if (zustand.modus === 'hand') {
+  if (dampfbetrieb.zerstoert) {
+    melde('Die Lok ist explodiert. „Von vorn“ setzt eine Ersatzlok aufs Gleis.', 'schlecht');
+  } else if (!dampfbetrieb.fahrbereit) {
+    melde('Brennstab kaufen, um weiterzurangieren.', 'schlecht');
+  } else if (zustand.modus === 'hand') {
     melde('Ein Gleis anklicken (oder Taste A, B, C): Der vorderste Waggon wird gewählt. Dann das Zielgleis anklicken.');
   } else {
     melde('„sortiere() ausführen“ startet die Methode im Java-Programm mit dieser Belegung.');
@@ -305,7 +319,7 @@ function zeichneGleisbild() {
     marke.textContent = nummern.length > 0 ? 'top()' : 'isEmpty()';
     strecke.append(marke);
     knopf.classList.toggle('gewaehlt', zustand.gewaehlt === gleis);
-    knopf.disabled = zustand.modus !== 'hand';
+    knopf.disabled = zustand.modus !== 'hand' || !dampfbetrieb.fahrbereit;
     const inhalt = nummern.length > 0 ? `Waggons ${nummern.join(', ')} (vom Prellbock nach vorne)` : 'leer';
     knopf.setAttribute('aria-label', `Gleis ${gleis}: ${inhalt}`);
   }
@@ -356,12 +370,13 @@ function stelleTastenEin() {
   $('tastenAlgo').hidden = !algo;
   $('tastenHand').hidden = algo;
   $('checkliste').hidden = !algo;
-  const offen = laufOffen();
+  const offen = laufOffen() && dampfbetrieb.fahrbereit;
+  $('ausfuehren').disabled = !dampfbetrieb.fahrbereit;
   $('pause').disabled = !offen;
   $('pause').textContent = zustand.laeuft ? 'Pause' : 'Weiter';
   $('einSchritt').disabled = !offen;
   $('zumEnde').disabled = !offen;
-  $('zumEndeHand').disabled = !(zustand.betrieb && zustand.betrieb.beschaeftigt);
+  $('zumEndeHand').disabled = !zustand.betrieb?.beschaeftigt || !dampfbetrieb.fahrbereit;
 }
 
 function setzeModus(modus) {
@@ -379,7 +394,7 @@ function stelleKameraEin(art, dauer = 0.9) {
   // Die Punkte, die in Übersicht und Draufsicht im Bild sein müssen.
   const ecken = [];
   for (const x of [plan.xPrellbock - 4.4, plan.xEnde + 1.6]) {
-    for (const z of [-MASSE.GLEISABSTAND - 3, MASSE.GLEISABSTAND + 3]) {
+    for (const z of [-MASSE.GLEISABSTAND - 3, MASSE.GLEISABSTAND + 7.4]) {
       for (const y of [0, 6.5]) ecken.push(new THREE.Vector3(x, y, z));
     }
   }
@@ -415,7 +430,7 @@ kamera.beiKlick = (e) => {
 kamera.beiBewegung = (e, zieht) => {
   const flaeche = $('szene');
   flaeche.classList.toggle('greift', zieht);
-  if (zieht || zustand.modus !== 'hand') {
+  if (zieht || zustand.modus !== 'hand' || !dampfbetrieb.fahrbereit) {
     zustand.schwebend = null;
     flaeche.classList.remove('zeigt');
     return;
@@ -441,11 +456,13 @@ async function pruefeVerbindung() {
     kennung = null;
   }
   const verbunden = kennung !== null;
+  const warVerbunden = zustand.verbunden;
   const neuGestartet = verbunden && zustand.kennung !== null && zustand.kennung !== kennung;
   zustand.verbunden = verbunden;
   if (verbunden) zustand.kennung = kennung;
   $('verbindungLampe').className = 'lampe ' + (verbunden ? 'gruen' : 'rot');
   $('verbindungText').textContent = verbunden ? 'Java-Programm verbunden' : 'Java-Programm läuft nicht';
+  if (verbunden && (!warVerbunden || neuGestartet)) dampfbetrieb.aktualisierePreis();
   if (neuGestartet && zustand.modus === 'algo') fuehreAlgorithmusAus();
 }
 
@@ -466,7 +483,33 @@ $('anzahl').addEventListener('change', () => {
   merke('anzahl', $('anzahl').value);
   baueAuf(wuerfle(Number($('anzahl').value)));
 });
-$('vonVorn').addEventListener('click', () => stelleStartHer());
+$('vonVorn').addEventListener('click', () => {
+  dampfbetrieb.repariere();
+  stelleStartHer();
+});
+$('brennstabKaufen').addEventListener('click', () => {
+  if (!dampfbetrieb.kaufe()) return;
+  zeichneGleisbild();
+  stelleTastenEin();
+  if (zustand.betrieb.beschaeftigt && zustand.laeuft) {
+    melde('Die Rangierfahrt wird fortgesetzt.');
+  } else if (laufOffen()) {
+    melde('Die Wiedergabe ist pausiert.');
+  } else {
+    zeigeGrundmeldung();
+  }
+});
+$('az5').addEventListener('click', () => {
+  dampfbetrieb.sprenge();
+  sortierAnfrage++;
+  zustand.lauf = null;
+  zustand.laeuft = false;
+  zustand.schwebend = null;
+  waehle(null);
+  zeichneZaehler();
+  zeigeGrundmeldung();
+  stelleTastenEin();
+});
 $('ausfuehren').addEventListener('click', () => fuehreAlgorithmusAus());
 $('pause').addEventListener('click', () => {
   zustand.laeuft = !zustand.laeuft;
@@ -486,11 +529,11 @@ $('zumEnde').addEventListener('click', () => {
   zustand.haltNachZug = false;
   zustand.laeuft = true;
   if (!zustand.betrieb.beschaeftigt) spieleNaechsten(zustand.lauf);
-  zustand.betrieb.springeAnsEnde();
+  ueberspringeFahrten();
   stelleTastenEin();
 });
 $('zumEndeHand').addEventListener('click', () => {
-  zustand.betrieb.springeAnsEnde();
+  ueberspringeFahrten();
   stelleTastenEin();
 });
 $('tempo').addEventListener('input', () => {
@@ -538,7 +581,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) pruefeVerbindung();
+  if (!document.hidden) {
+    if (zustand.verbunden) dampfbetrieb.aktualisierePreis();
+    pruefeVerbindung();
+  }
 });
 
 new ResizeObserver(() => {
@@ -564,16 +610,37 @@ if (erinnere('modus') === 'algo') zustand.modus = 'algo';
 baueAuf(wuerfle(Number($('anzahl').value)));
 pruefeVerbindung();
 setInterval(pruefeVerbindung, 1000);
+setInterval(() => {
+  if (zustand.verbunden && !document.hidden) dampfbetrieb.aktualisierePreis();
+}, 5 * 60 * 1000);
+
+function fahre(sekunden) {
+  if (!dampfbetrieb.fahrbereit) return 0;
+  const genutzt = dampfbetrieb.fahre(zustand.betrieb, sekunden);
+  if (!dampfbetrieb.fahrbereit) {
+    waehle(null);
+    zustand.schwebend = null;
+    zeigeGrundmeldung();
+    stelleTastenEin();
+  }
+  return genutzt;
+}
+
+function ueberspringeFahrten() {
+  while (zustand.betrieb.beschaeftigt && fahre(dampfbetrieb.brennstoff) > 0) {
+    // Beim Sprung zählt dieselbe Brennzeit wie bei einer sichtbaren Fahrt.
+  }
+}
 
 let letzteZeit = performance.now();
 function bild(jetzt) {
   const dt = Math.min(0.1, (jetzt - letzteZeit) / 1000);
   letzteZeit = jetzt;
-  if (zustand.laeuft) zustand.betrieb.schritt(dt * zustand.tempo);
+  const fahrzeit = zustand.laeuft ? fahre(dt * zustand.tempo) : 0;
+  dampfbetrieb.effekte.schritt(dt, fahrzeit);
   kamera.schritt(dt);
   welt.markiere(zustand.schwebend, zustand.gewaehlt);
   welt.passeSchilderAn();
-  for (const w of zustand.waggons) w.zeigeMarke(welt);
   welt.zeichne();
   requestAnimationFrame(bild);
 }
@@ -581,9 +648,11 @@ requestAnimationFrame(bild);
 
 // Für Neugierige und zur Fehlersuche in der Browser-Konsole erreichbar.
 window.rangierbahnhof = {
-  zustand, welt, kamera, lok, baueAuf, verschiebe, stelleKameraEin,
+  zustand, welt, kamera, lok, dampfbetrieb, baueAuf, verschiebe, stelleKameraEin,
   /** Lässt die Rangierfahrt um die angegebene Zeit (Sekunden) weiterlaufen. */
   vor(sekunden) {
-    for (let t = 0; t < sekunden; t += 0.02) zustand.betrieb.schritt(0.02);
+    for (let t = 0; t < sekunden; t += 0.02) {
+      dampfbetrieb.effekte.schritt(0.02, fahre(Math.min(0.02, sekunden - t)));
+    }
   },
 };
