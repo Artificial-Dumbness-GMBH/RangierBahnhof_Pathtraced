@@ -37,21 +37,23 @@ export class Dampfbetrieb {
   get fahrbereit() { return !this.zerstoert && this.brennstoff > 0; }
   get preis() { return Math.round(this.kurs.usdProPfund * 100) + AUFSCHLAG_CENT; }
 
-  fahre(betrieb, sekunden) {
+  fahre(betrieb, sekunden, bis = Infinity) {
     if (!this.fahrbereit || !betrieb.beschaeftigt) return 0;
+    const faesserVorher = this.faesser;
     let rest = sekunden;
-    while (rest > 0 && this.fahrbereit && betrieb.beschaeftigt) {
+    while (rest > 0 && this.fahrbereit && betrieb.beschaeftigt && performance.now() < bis) {
       const dauer = Math.min(rest, this.brennstoff);
       const genutzt = betrieb.schritt(dauer);
       rest -= genutzt;
       this.brennstoff = Math.max(0, this.brennstoff - genutzt);
       if (this.brennstoff < 0.000001) {
         this.brennstoff = 0;
-        this.kaufeAutomatisch();
+        if (this.autobuy) this.bucheBrennstab();
       }
       if (genutzt <= 0) break;
     }
-    this.zeige();
+    if (this.faesser !== faesserVorher) this.zeigeKauf();
+    else this.zeige();
     return sekunden - rest;
   }
 
@@ -69,14 +71,22 @@ export class Dampfbetrieb {
 
   kaufe() {
     if (this.zerstoert || this.brennstoff > 0) return false;
+    this.bucheBrennstab();
+    this.zeigeKauf();
+    return true;
+  }
+
+  bucheBrennstab() {
     this.ausgaben += this.preis;
     this.faesser++;
     this.brennstoff = BRENNZEIT;
+  }
+
+  zeigeKauf() {
     this.welt.fuelleDepot(this.faesser);
     this.speichere();
     this.zeige();
     this.zeigePreis();
-    return true;
   }
 
   sprenge() {

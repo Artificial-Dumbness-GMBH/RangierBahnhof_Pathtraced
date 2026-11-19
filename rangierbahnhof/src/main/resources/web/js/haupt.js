@@ -15,6 +15,7 @@ import { Rangierbetrieb } from './rangierfahrt.js';
 import { Kamerafuehrung } from './kamera.js';
 
 const $ = (id) => document.getElementById(id);
+const BOOST_STUFEN = { zeitBoost: 10_000, zeitBoostPlus: 1_000_000 };
 
 const welt = new Welt($('szene'));
 const kamera = new Kamerafuehrung(welt.kamera, $('szene'));
@@ -46,7 +47,8 @@ const zustand = {
   haltNachZug: false,
   lauf: null,
   tempo: 2,
-  zeitBoost: false,
+  zeitBoost: null,
+  offeneBoostZeit: 0,
   verbunden: false,
   kennung: null,
   kameraArt: 'uebersicht',
@@ -125,6 +127,7 @@ function baueAuf(start) {
 function stelleStartHer() {
   sortierAnfrage++;
   offenerBefehl = null;
+  zustand.offeneBoostZeit = 0;
   zustand.lauf = null;
   zustand.laeuft = true;
   zustand.vorspulen = false;
@@ -515,11 +518,13 @@ function setzeTempo() {
   const regTempo = regler <= 45
     ? 0.5 * Math.pow(4, regler / 45)
     : 2 * Math.pow(50, (regler - 45) / 55);
-  zustand.tempo = zustand.zeitBoost ? 10000 : regTempo;
+  zustand.tempo = BOOST_STUFEN[zustand.zeitBoost] ?? regTempo;
   const zahl = zustand.tempo >= 10 ? Math.round(zustand.tempo) : Math.round(zustand.tempo * 10) / 10;
   $('tempoWert').textContent = zahl.toLocaleString('de-DE') + '×';
-  $('tempo').disabled = zustand.zeitBoost;
-  $('zeitBoost').setAttribute('aria-pressed', String(zustand.zeitBoost));
+  $('tempo').disabled = zustand.zeitBoost !== null;
+  for (const id of Object.keys(BOOST_STUFEN)) {
+    $(id).setAttribute('aria-pressed', String(zustand.zeitBoost === id));
+  }
 }
 
 // ------------------------------------------------------------ Bedienung
@@ -559,6 +564,7 @@ $('az5').addEventListener('click', () => {
   zustand.lauf = null;
   zustand.laeuft = false;
   zustand.vorspulen = false;
+  zustand.offeneBoostZeit = 0;
   zustand.schwebend = null;
   waehle(null);
   zeichneZaehler();
@@ -568,6 +574,7 @@ $('az5').addEventListener('click', () => {
 $('ausfuehren').addEventListener('click', () => fuehreAlgorithmusAus());
 $('pause').addEventListener('click', () => {
   zustand.vorspulen = false;
+  zustand.offeneBoostZeit = 0;
   zustand.laeuft = !zustand.laeuft;
   zustand.haltNachZug = false;
   if (zustand.laeuft && laufOffen() && !zustand.betrieb.beschaeftigt) spieleNaechsten(zustand.lauf);
@@ -576,6 +583,7 @@ $('pause').addEventListener('click', () => {
 $('einSchritt').addEventListener('click', () => {
   if (!laufOffen()) return;
   zustand.vorspulen = false;
+  zustand.offeneBoostZeit = 0;
   zustand.haltNachZug = true;
   zustand.laeuft = true;
   if (!zustand.betrieb.beschaeftigt) spieleNaechsten(zustand.lauf);
@@ -593,10 +601,13 @@ $('tempo').addEventListener('input', () => {
   setzeTempo();
   merke('tempo', $('tempo').value);
 });
-$('zeitBoost').addEventListener('click', () => {
-  zustand.zeitBoost = !zustand.zeitBoost;
-  setzeTempo();
-});
+for (const id of Object.keys(BOOST_STUFEN)) {
+  $(id).addEventListener('click', () => {
+    zustand.zeitBoost = zustand.zeitBoost === id ? null : id;
+    zustand.offeneBoostZeit = 0;
+    setzeTempo();
+  });
+}
 for (const knopf of document.querySelectorAll('[data-kamera]')) {
   knopf.addEventListener('click', () => stelleKameraEin(knopf.dataset.kamera));
 }
@@ -677,9 +688,9 @@ setInterval(() => {
   if (zustand.verbunden && !document.hidden) dampfbetrieb.aktualisierePreis();
 }, 5 * 60 * 1000);
 
-function fahre(sekunden) {
+function fahre(sekunden, bis) {
   if (!dampfbetrieb.fahrbereit) return 0;
-  const genutzt = dampfbetrieb.fahre(zustand.betrieb, sekunden);
+  const genutzt = dampfbetrieb.fahre(zustand.betrieb, sekunden, bis);
   if (!dampfbetrieb.fahrbereit) {
     waehle(null);
     zustand.schwebend = null;
@@ -690,6 +701,7 @@ function fahre(sekunden) {
 }
 
 function wechsleVorspulen() {
+  zustand.offeneBoostZeit = 0;
   zustand.vorspulen = !zustand.vorspulen;
   if (zustand.vorspulen) spuleVor();
   stelleTastenEin();
@@ -715,7 +727,13 @@ function bild(jetzt) {
   let fahrzeit = 0;
   if (zustand.laeuft) {
     if (zustand.vorspulen) spuleVor();
-    else fahrzeit = fahre(dt * zustand.tempo);
+    else if (zustand.zeitBoost === 'zeitBoostPlus') {
+      // Bei hoher Last nur begrenzt Zeit nachholen, damit das Stellpult reagiert.
+      const offen = Math.min(zustand.tempo * 0.1, zustand.offeneBoostZeit + dt * zustand.tempo);
+      fahrzeit = fahre(offen, performance.now() + 8);
+      zustand.offeneBoostZeit = zustand.betrieb.beschaeftigt && dampfbetrieb.fahrbereit
+        ? offen - fahrzeit : 0;
+    } else fahrzeit = fahre(dt * zustand.tempo);
   }
   // Beim Boost genügt der letzte Rangierbefehl pro Bild.
   if (offenerBefehl !== null) zeichneVerschiebung();
