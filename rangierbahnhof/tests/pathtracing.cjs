@@ -47,6 +47,34 @@ const pixels=await page.evaluate(()=>{
 });
 assert.equal(pixels.finite,true,'finite GPU output');
 assert.equal(pixels.lit,true,'non-black GPU output');
+const lampenTest = await page.evaluate(() => {
+  const { welt } = rangierbahnhof;
+  const { zeichner, pathtracing, lichtquellen } = welt;
+  const intensive = lichtquellen.map(lampe => lampe.intensity);
+  const mitLicht = new Float32Array(160 * 90 * 4);
+  const ohneLicht = new Float32Array(mitLicht.length);
+  const saat = pathtracing.saat;
+  function liesBild(ziel) {
+    pathtracing.samples = 0;
+    pathtracing.saat = saat;
+    welt.zeichne();
+    zeichner.readRenderTargetPixels(pathtracing.ziele[0], 0, 0, 160, 90, ziel);
+  }
+  try {
+    liesBild(mitLicht);
+    for (const lampe of lichtquellen) lampe.intensity = 0;
+    liesBild(ohneLicht);
+    return {
+      scheinwerfer: lichtquellen.filter(lampe => lampe.isSpotLight && lampe.castShadow).length,
+      beleuchtetePixel: mitLicht.filter((wert, i) => i % 4 === 0 && wert - ohneLicht[i] > 0.015).length,
+    };
+  } finally {
+    lichtquellen.forEach((lampe, i) => { lampe.intensity = intensive[i]; });
+  }
+});
+assert.equal(lampenTest.scheinwerfer, 4, 'yard spotlights cast shadows');
+assert.ok(lampenTest.beleuchtetePixel > 100, 'yard lights brighten path traced surfaces');
+
 await page.click('#raymarching');
 assert.equal(await page.locator('#raymarching').getAttribute('aria-pressed'), 'true');
 assert.equal(await page.locator('#pathtracing').getAttribute('aria-pressed'), 'false');

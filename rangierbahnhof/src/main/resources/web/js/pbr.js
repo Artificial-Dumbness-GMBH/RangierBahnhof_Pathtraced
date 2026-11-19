@@ -8,7 +8,8 @@ const profile = {
   schotter: { tiefe: 0.095, rauheit: 0.88, metall: 0 },
   ziegel:   { tiefe: 0.055, rauheit: 0.82, metall: 0 },
   holz:     { tiefe: 0.045, rauheit: 0.77, metall: 0 },
-  stahl:    { tiefe: 0.020, rauheit: 0.36, metall: 0.87 },
+  lack:     { tiefe: 0.015, rauheit: 0.28, metall: 0.43 },
+  stahl:    { tiefe: 0.020, rauheit: 0.23, metall: 0.90 },
 };
 
 function tiefeBei(art, x, y) {
@@ -23,7 +24,7 @@ function tiefeBei(art, x, y) {
     return y % 16 < 2 || (x + (zeile % 2 ? 0 : 16)) % 32 < 2 ? 0.92 : 0.13 + korn * 0.24;
   }
   if (art === 'holz') return x % 8 < 1 ? 0.85 : 0.18 + 0.19 * korn + 0.15 * welle(24, 1);
-  if (art === 'stahl') return 0.36 + 0.15 * korn + 0.12 * welle(0, 29);
+  if (art === 'stahl' || art === 'lack') return 0.36 + 0.15 * korn + 0.12 * welle(0, 29);
   if (art === 'gras') return 0.22 + 0.38 * korn + 0.15 * welle(9, 7);
   return 0.47 + 0.24 * welle(11, 5) * welle(8, -9) + 0.27 * (korn - 0.5);
 }
